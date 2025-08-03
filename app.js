@@ -17,8 +17,8 @@ let coloringCanvas, coloringCtx;
 let mouseCursor = null;
 let mousePosition = { x: 0, y: 0 };
 let isPinching = false;
-let lastPinchDistance = 0;
-let pinchState = 'none'; // 'none', 'pinched', 'spread', 'clicking'
+let pinchCount = 0; // 记录捏合次数
+let lastPinchTime = 0; // 上次捏合时间
 let isDragging = false;
 let dragTarget = null;
 let dragStartValue = 0;
@@ -400,8 +400,7 @@ function detectGestureAndDraw(landmarks) {
     );
     
     // 捏合阈值（像素）
-    const pinchThreshold = 30;
-    const spreadThreshold = 60; // 张开阈值
+    const pinchThreshold = 35;
     
     // 检测手势状态
     if (pinchDistance < pinchThreshold) {
@@ -410,13 +409,23 @@ function detectGestureAndDraw(landmarks) {
             isPinching = true;
             positionHistory = [];
             
-            // 检测是否是从张开到捏合（点击手势）
-            if (pinchState === 'spread') {
-                // 触发点击
-                performClick();
-                pinchState = 'clicking';
+            // 检测双击（连续两次捏合）
+            const currentTime = Date.now();
+            if (currentTime - lastPinchTime < 800) { // 800ms内第二次捏合
+                pinchCount++;
+                if (pinchCount >= 2) {
+                    // 连续两次捏合，触发点击
+                    performClick();
+                    pinchCount = 0;
+                    lastPinchTime = 0;
+                }
             } else {
-                pinchState = 'pinched';
+                // 第一次捏合
+                pinchCount = 1;
+                lastPinchTime = currentTime;
+                
+                // 显示提示
+                showClickHint();
             }
         }
         
@@ -473,41 +482,40 @@ function detectGestureAndDraw(landmarks) {
         // 停止绘制
         isDrawing = false;
         isErasing = false;
-        lastPinchDistance = pinchDistance;
-        return;
-        
-    } else if (pinchDistance > spreadThreshold && isPinching) {
-        // 手指张开状态
-        pinchState = 'spread';
-        lastPinchDistance = pinchDistance;
-        
-        // 保持鼠标显示
-        showMouseCursor(mousePosition.x, mousePosition.y);
-        updateCursorForSpread();
-        
-        // 停止绘制
-        isDrawing = false;
-        isErasing = false;
         return;
         
     } else {
-        // 退出鼠标模式
+        // 手指松开状态
         if (isPinching) {
+            isPinching = false;
+            
+            // 检查是否超时（超过800ms清空计数）
+            if (Date.now() - lastPinchTime > 800) {
+                pinchCount = 0;
+                hideClickHint();
+            }
+            
+            // 继续保持鼠标模式，但是松开状态
+            showMouseCursor(mousePosition.x, mousePosition.y);
+            
             // 结束拖拽
             if (isDragging) {
                 endDrag();
             }
-            
-            // 清理状态
+        }
+        
+        // 完全离开鼠标模式的条件：距离大于100像素
+        if (pinchDistance > 100) {
             if (hoveredElement) {
                 unhighlightElement(hoveredElement);
             }
             
-            isPinching = false;
-            pinchState = 'none';
+            pinchCount = 0;
+            lastPinchTime = 0;
             hoveredElement = null;
             positionHistory = [];
             hideMouseCursor();
+            hideClickHint();
         }
     }
     
@@ -815,21 +823,32 @@ function showMouseCursor(x, y) {
     }
 }
 
-// 张开手指时的光标状态
-function updateCursorForSpread() {
+// 显示点击提示
+function showClickHint() {
     if (mouseCursor) {
-        mouseCursor.style.width = '60px';
-        mouseCursor.style.height = '60px';
-        mouseCursor.style.borderColor = '#ffc107';
-        mouseCursor.style.borderWidth = '4px';
-        mouseCursor.style.borderStyle = 'dashed';
-        
-        // 显示状态提示
         const statusText = document.getElementById('mouseStatusText');
         if (statusText) {
             statusText.style.display = 'block';
-            statusText.textContent = '松手点击';
+            if (pinchCount === 1) {
+                statusText.textContent = '再次捏合点击';
+                statusText.style.background = 'rgba(255, 152, 0, 0.9)';
+                mouseCursor.style.borderColor = '#ff9800';
+                mouseCursor.style.borderWidth = '4px';
+            }
         }
+    }
+}
+
+// 隐藏点击提示
+function hideClickHint() {
+    const statusText = document.getElementById('mouseStatusText');
+    if (statusText) {
+        statusText.style.display = 'none';
+        statusText.style.background = 'rgba(0, 0, 0, 0.7)';
+    }
+    if (mouseCursor) {
+        mouseCursor.style.borderColor = '#667eea';
+        mouseCursor.style.borderWidth = '3px';
     }
 }
 
@@ -843,6 +862,8 @@ function hideMouseCursor() {
             statusText.style.display = 'none';
         }
     }
+    pinchCount = 0;
+    lastPinchTime = 0;
 }
 
 // 执行点击
@@ -861,6 +882,16 @@ function performClick() {
             // 视觉反馈
             clickFeedback(targetElement);
         }
+        
+        // 成功点击的额外反馈
+        if (mouseCursor) {
+            mouseCursor.style.borderColor = '#4CAF50';
+            mouseCursor.style.borderWidth = '5px';
+            setTimeout(() => {
+                mouseCursor.style.borderColor = hoveredElement ? '#4CAF50' : '#667eea';
+                mouseCursor.style.borderWidth = '3px';
+            }, 300);
+        }
     }
     
     // 点击动画
@@ -873,6 +904,9 @@ function performClick() {
             }, 300);
         }
     }
+    
+    // 隐藏提示
+    hideClickHint();
 }
 
 // 点击反馈
