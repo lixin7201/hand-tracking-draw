@@ -196,12 +196,15 @@ function initializeControls() {
     const colorOptions = document.querySelectorAll('.color-option');
     colorOptions.forEach(option => {
         option.addEventListener('click', (e) => {
-            colorOptions.forEach(opt => opt.classList.remove('active'));
-            e.target.classList.add('active');
-            currentColor = e.target.dataset.color;
-            isErasing = false;
+            selectColor(e.target.dataset.color, e.target);
         });
     });
+    
+    // 颜色板按钮
+    const colorPaletteBtn = document.getElementById('colorPaletteBtn');
+    if (colorPaletteBtn) {
+        colorPaletteBtn.addEventListener('click', openColorPalette);
+    }
     
     // 画笔大小
     const brushSizeInput = document.getElementById('brushSize');
@@ -743,6 +746,118 @@ function closeSaveModal() {
         modal.classList.remove('show');
     }
 }
+
+// 颜色板相关功能
+let recentColors = JSON.parse(localStorage.getItem('recentColors') || '[]');
+const MAX_RECENT_COLORS = 12;
+
+// 打开颜色板
+function openColorPalette() {
+    const modal = document.getElementById('colorPaletteModal');
+    if (modal) {
+        modal.classList.add('show');
+        updateRecentColors();
+        initializePaletteEvents();
+    }
+}
+
+// 关闭颜色板
+function closeColorPalette() {
+    const modal = document.getElementById('colorPaletteModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+// 选择颜色
+function selectColor(color, element = null) {
+    currentColor = color;
+    isErasing = false;
+    
+    // 更新底部颜色选择器的活动状态
+    document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('active'));
+    if (element) {
+        element.classList.add('active');
+    } else {
+        // 如果从颜色板选择，尝试找到匹配的颜色选项
+        const matchingOption = document.querySelector(`.color-option[data-color="${color}"]`);
+        if (matchingOption) {
+            matchingOption.classList.add('active');
+        }
+    }
+    
+    // 添加到最近使用的颜色
+    addToRecentColors(color);
+    
+    // 关闭颜色板
+    closeColorPalette();
+}
+
+// 添加到最近使用的颜色
+function addToRecentColors(color) {
+    // 移除已存在的相同颜色
+    recentColors = recentColors.filter(c => c !== color);
+    // 添加到开头
+    recentColors.unshift(color);
+    // 限制数量
+    if (recentColors.length > MAX_RECENT_COLORS) {
+        recentColors = recentColors.slice(0, MAX_RECENT_COLORS);
+    }
+    // 保存到本地存储
+    localStorage.setItem('recentColors', JSON.stringify(recentColors));
+}
+
+// 更新最近使用的颜色显示
+function updateRecentColors() {
+    const container = document.getElementById('recentColors');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    recentColors.forEach(color => {
+        const colorDiv = document.createElement('div');
+        colorDiv.className = 'palette-color';
+        colorDiv.style.background = color;
+        colorDiv.dataset.color = color;
+        colorDiv.onclick = () => selectColor(color);
+        container.appendChild(colorDiv);
+    });
+}
+
+// 应用自定义颜色
+function applyCustomColor() {
+    const picker = document.getElementById('customColorPicker');
+    if (picker) {
+        selectColor(picker.value);
+    }
+}
+
+// 初始化颜色板事件
+function initializePaletteEvents() {
+    // 预设颜色点击事件
+    const paletteColors = document.querySelectorAll('.palette-color');
+    paletteColors.forEach(colorEl => {
+        if (!colorEl.onclick) {
+            colorEl.onclick = () => selectColor(colorEl.dataset.color);
+        }
+    });
+    
+    // 自定义颜色选择器变化事件
+    const customPicker = document.getElementById('customColorPicker');
+    if (customPicker && !customPicker.hasAttribute('data-initialized')) {
+        customPicker.setAttribute('data-initialized', 'true');
+        customPicker.addEventListener('change', () => {
+            // 实时预览颜色
+            const previewBtn = document.querySelector('.apply-color-btn');
+            if (previewBtn) {
+                previewBtn.style.background = `linear-gradient(135deg, ${customPicker.value} 0%, ${customPicker.value} 100%)`;
+            }
+        });
+    }
+}
+
+// 确保关闭按钮功能可用
+window.closeColorPalette = closeColorPalette;
+window.applyCustomColor = applyCustomColor;
 
 // 支持的宽高比列表
 const SUPPORTED_RATIOS = [

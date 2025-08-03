@@ -816,6 +816,188 @@
                 flex-direction: column;
             }
         }
+
+        /* 颜色板按钮样式 */
+        .color-palette-btn {
+            width: 35px;
+            height: 35px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 10px;
+        }
+
+        .color-palette-btn:hover {
+            transform: scale(1.1);
+            border-color: #666;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* 颜色板弹窗样式 */
+        .color-palette-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10003;
+        }
+
+        .color-palette-modal.show {
+            display: flex;
+        }
+
+        .color-palette-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        .color-palette-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s;
+        }
+
+        .color-palette-close:hover {
+            color: #000;
+        }
+
+        /* 自定义颜色选择器 */
+        .custom-color-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 10px;
+        }
+
+        #customColorPicker {
+            width: 60px;
+            height: 40px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .apply-color-btn {
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.3s;
+        }
+
+        .apply-color-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* 颜色网格 */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 10px;
+            margin: 10px 0 20px;
+        }
+
+        .palette-color {
+            width: 40px;
+            height: 40px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .palette-color:hover {
+            transform: scale(1.15);
+            border-color: #333;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .palette-color.selected {
+            border-color: #000;
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px rgba(0,0,0,0.2);
+        }
+
+        /* 最近使用的颜色 */
+        .recent-colors-section {
+            margin: 20px 0;
+        }
+
+        .recent-colors-section h3,
+        .preset-colors-section h3 {
+            font-size: 16px;
+            color: #333;
+            margin: 15px 0 10px;
+            font-weight: 600;
+        }
+
+        .preset-colors-section {
+            margin: 20px 0;
+        }
+
+        /* 空状态 */
+        #recentColors:empty::after {
+            content: '暂无最近使用的颜色';
+            color: #999;
+            font-size: 14px;
+            display: block;
+            text-align: center;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .color-palette-content {
+                width: 95%;
+                padding: 20px;
+            }
+
+            .color-grid {
+                grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
+                gap: 8px;
+            }
+
+            .palette-color {
+                width: 35px;
+                height: 35px;
+            }
+
+            .color-palette-btn {
+                width: 30px;
+                height: 30px;
+                font-size: 16px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -879,6 +1061,7 @@
             <div class="color-option" style="background: #00FFFF;" data-color="#00FFFF"></div>
             <div class="color-option" style="background: #000000;" data-color="#000000"></div>
             <div class="color-option" style="background: #FFFFFF;" data-color="#FFFFFF"></div>
+            <button class="color-palette-btn" id="colorPaletteBtn" title="更多颜色">🎨</button>
         </div>
         <div class="brush-size">
             <label>画笔大小:</label>
@@ -961,6 +1144,94 @@
                 <button class="result-btn" id="saveResultBtn">保存艺术画</button>
                 <button class="result-btn" id="tryAgainBtn">换个风格</button>
                 <button class="result-close" onclick="closeResultModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 颜色板弹窗 -->
+    <div id="colorPaletteModal" class="color-palette-modal">
+        <div class="color-palette-content">
+            <button class="color-palette-close" onclick="closeColorPalette()">×</button>
+            <h2>🎨 选择颜色</h2>
+            
+            <!-- 自定义颜色选择器 -->
+            <div class="custom-color-section">
+                <label>自定义颜色:</label>
+                <input type="color" id="customColorPicker" value="#FF0000">
+                <button class="apply-color-btn" onclick="applyCustomColor()">应用</button>
+            </div>
+            
+            <!-- 最近使用的颜色 -->
+            <div class="recent-colors-section">
+                <h3>最近使用</h3>
+                <div id="recentColors" class="color-grid"></div>
+            </div>
+            
+            <!-- 预设颜色主题 -->
+            <div class="preset-colors-section">
+                <h3>彩虹色系</h3>
+                <div class="color-grid">
+                    <div class="palette-color" style="background: #FF0000;" data-color="#FF0000"></div>
+                    <div class="palette-color" style="background: #FF4500;" data-color="#FF4500"></div>
+                    <div class="palette-color" style="background: #FFA500;" data-color="#FFA500"></div>
+                    <div class="palette-color" style="background: #FFD700;" data-color="#FFD700"></div>
+                    <div class="palette-color" style="background: #FFFF00;" data-color="#FFFF00"></div>
+                    <div class="palette-color" style="background: #ADFF2F;" data-color="#ADFF2F"></div>
+                    <div class="palette-color" style="background: #00FF00;" data-color="#00FF00"></div>
+                    <div class="palette-color" style="background: #00CED1;" data-color="#00CED1"></div>
+                    <div class="palette-color" style="background: #00BFFF;" data-color="#00BFFF"></div>
+                    <div class="palette-color" style="background: #0000FF;" data-color="#0000FF"></div>
+                    <div class="palette-color" style="background: #4B0082;" data-color="#4B0082"></div>
+                    <div class="palette-color" style="background: #8B008B;" data-color="#8B008B"></div>
+                </div>
+                
+                <h3>粉彩色系</h3>
+                <div class="color-grid">
+                    <div class="palette-color" style="background: #FFB6C1;" data-color="#FFB6C1"></div>
+                    <div class="palette-color" style="background: #FFC0CB;" data-color="#FFC0CB"></div>
+                    <div class="palette-color" style="background: #FFDAB9;" data-color="#FFDAB9"></div>
+                    <div class="palette-color" style="background: #F0E68C;" data-color="#F0E68C"></div>
+                    <div class="palette-color" style="background: #E6E6FA;" data-color="#E6E6FA"></div>
+                    <div class="palette-color" style="background: #DDA0DD;" data-color="#DDA0DD"></div>
+                    <div class="palette-color" style="background: #B0E0E6;" data-color="#B0E0E6"></div>
+                    <div class="palette-color" style="background: #98FB98;" data-color="#98FB98"></div>
+                    <div class="palette-color" style="background: #F5DEB3;" data-color="#F5DEB3"></div>
+                    <div class="palette-color" style="background: #FFE4E1;" data-color="#FFE4E1"></div>
+                    <div class="palette-color" style="background: #E0FFFF;" data-color="#E0FFFF"></div>
+                    <div class="palette-color" style="background: #F0FFF0;" data-color="#F0FFF0"></div>
+                </div>
+                
+                <h3>经典色系</h3>
+                <div class="color-grid">
+                    <div class="palette-color" style="background: #800000;" data-color="#800000"></div>
+                    <div class="palette-color" style="background: #8B0000;" data-color="#8B0000"></div>
+                    <div class="palette-color" style="background: #DC143C;" data-color="#DC143C"></div>
+                    <div class="palette-color" style="background: #FF1493;" data-color="#FF1493"></div>
+                    <div class="palette-color" style="background: #C71585;" data-color="#C71585"></div>
+                    <div class="palette-color" style="background: #FF69B4;" data-color="#FF69B4"></div>
+                    <div class="palette-color" style="background: #FF8C00;" data-color="#FF8C00"></div>
+                    <div class="palette-color" style="background: #FFA07A;" data-color="#FFA07A"></div>
+                    <div class="palette-color" style="background: #FA8072;" data-color="#FA8072"></div>
+                    <div class="palette-color" style="background: #E9967A;" data-color="#E9967A"></div>
+                    <div class="palette-color" style="background: #F08080;" data-color="#F08080"></div>
+                    <div class="palette-color" style="background: #CD5C5C;" data-color="#CD5C5C"></div>
+                </div>
+                
+                <h3>自然色系</h3>
+                <div class="color-grid">
+                    <div class="palette-color" style="background: #228B22;" data-color="#228B22"></div>
+                    <div class="palette-color" style="background: #008000;" data-color="#008000"></div>
+                    <div class="palette-color" style="background: #006400;" data-color="#006400"></div>
+                    <div class="palette-color" style="background: #90EE90;" data-color="#90EE90"></div>
+                    <div class="palette-color" style="background: #32CD32;" data-color="#32CD32"></div>
+                    <div class="palette-color" style="background: #00FA9A;" data-color="#00FA9A"></div>
+                    <div class="palette-color" style="background: #40E0D0;" data-color="#40E0D0"></div>
+                    <div class="palette-color" style="background: #48D1CC;" data-color="#48D1CC"></div>
+                    <div class="palette-color" style="background: #4682B4;" data-color="#4682B4"></div>
+                    <div class="palette-color" style="background: #6495ED;" data-color="#6495ED"></div>
+                    <div class="palette-color" style="background: #708090;" data-color="#708090"></div>
+                    <div class="palette-color" style="background: #2F4F4F;" data-color="#2F4F4F"></div>
+                </div>
             </div>
         </div>
     </div>
