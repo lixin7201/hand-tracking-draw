@@ -1,11 +1,14 @@
 // AI Transform API Integration Module
 
+// 检测是否在生产环境（Vercel）
+const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
 // Configuration
 const API_CONFIG = {
-    // Set to true to use proxy server, false for direct API calls
-    useProxy: true,  // 使用代理服务器避免CORS问题
-    // Proxy server URL (update this if running on a different port or host)
-    proxyUrl: 'http://localhost:3001',
+    // 在生产环境使用Vercel API路由，在本地使用代理服务器
+    useProxy: true,  // 总是使用代理（本地或Vercel）
+    // API URL根据环境自动选择
+    proxyUrl: isProduction ? '/api' : 'http://localhost:3001',
     // Direct API keys (only used when useProxy is false)
     // 注意：请不要在代码中硬编码API密钥！
     // 这些密钥应该通过环境变量或配置文件提供
@@ -88,7 +91,9 @@ async function analyzeDoodleContent(imageDataUrl, userDescription = '') {
     // 如果使用代理服务器
     if (API_CONFIG.useProxy) {
         try {
-            const response = await fetch(`${API_CONFIG.proxyUrl}/api/analyze-doodle`, {
+            // 根据环境调整URL路径
+            const apiPath = isProduction ? '/analyze-doodle' : '/api/analyze-doodle';
+            const response = await fetch(`${API_CONFIG.proxyUrl}${apiPath}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -175,7 +180,9 @@ async function generateFluxPrompt(doodleAnalysis, artStyle, imageDataUrl) {
     // 如果使用代理服务器
     if (API_CONFIG.useProxy) {
         try {
-            const response = await fetch(`${API_CONFIG.proxyUrl}/api/generate-prompt`, {
+            // 根据环境调整URL路径
+            const apiPath = isProduction ? '/generate-prompt' : '/api/generate-prompt';
+            const response = await fetch(`${API_CONFIG.proxyUrl}${apiPath}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -256,7 +263,9 @@ async function generateArtWithFlux(imageUrl, prompt, promptStrength = 0.8) {
     // 如果使用代理服务器
     if (API_CONFIG.useProxy) {
         try {
-            const response = await fetch(`${API_CONFIG.proxyUrl}/api/generate-art`, {
+            // 根据环境调整URL路径
+            const apiPath = isProduction ? '/generate-art' : '/api/generate-art';
+            const response = await fetch(`${API_CONFIG.proxyUrl}${apiPath}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
