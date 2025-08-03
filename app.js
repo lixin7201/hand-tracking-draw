@@ -714,12 +714,26 @@ function initializeMouseCursor() {
         position: absolute;
         width: 100%;
         height: 100%;
-        border: 3px solid #667eea;
+        border: 3px solid #4CAF50;
         border-radius: 50%;
         opacity: 0;
         pointer-events: none;
     `;
     mouseCursor.appendChild(clickAnimation);
+    
+    // 添加中心点
+    const centerDot = document.createElement('div');
+    centerDot.style.cssText = `
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        background: #667eea;
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    `;
+    mouseCursor.appendChild(centerDot);
 }
 
 function showMouseCursor(x, y) {
@@ -841,3 +855,67 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// 查找附近的可点击元素
+function findNearbyClickableElement(x, y) {
+    const searchRadius = 60; // 搜索半径
+    const elements = document.elementsFromPoint(x, y);
+    
+    // 首先检查直接点击位置
+    const directHit = elements.find(el => 
+        el.id !== 'drawingCanvas' && 
+        el.id !== 'handCanvas' && 
+        el.id !== 'virtualMouse' &&
+        el.id !== 'video' &&
+        (el.tagName === 'BUTTON' || 
+         el.classList.contains('color-option') || 
+         el.classList.contains('template-btn') ||
+         el.classList.contains('mode-btn') ||
+         el.tagName === 'INPUT')
+    );
+    
+    if (directHit) return directHit;
+    
+    // 如果没有直接命中，搜索附近区域
+    const clickables = document.querySelectorAll('button, .color-option, .template-btn, .mode-btn, input');
+    let nearestElement = null;
+    let nearestDistance = searchRadius;
+    
+    clickables.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestElement = el;
+        }
+    });
+    
+    return nearestElement;
+}
+
+// 高亮悬停元素
+function highlightElement(element) {
+    if (!element) return;
+    
+    element.style.transition = 'all 0.3s ease';
+    element.style.transform = 'scale(1.1)';
+    element.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.6)';
+    element.style.zIndex = '1001';
+    
+    // 为颜色选项添加特殊效果
+    if (element.classList.contains('color-option')) {
+        element.style.transform = 'scale(1.3)';
+    }
+}
+
+// 取消高亮
+function unhighlightElement(element) {
+    if (!element) return;
+    
+    element.style.transform = '';
+    element.style.boxShadow = '';
+    element.style.zIndex = '';
+}
