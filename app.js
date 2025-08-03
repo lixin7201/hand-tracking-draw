@@ -638,10 +638,13 @@ function saveWithCamera() {
     // 绘制用户的画
     tempCtx.drawImage(drawingCanvas, 0, 0);
     
+    // 应用宽高比裁剪
+    const result = createAspectRatioCanvas(tempCanvas, false);
+    
     // 下载图片
     const link = document.createElement('a');
-    link.download = `康康画画_原图_${new Date().getTime()}.png`;
-    link.href = tempCanvas.toDataURL();
+    link.download = `康康画画_原图_${result.ratio.replace(':', 'x')}_${new Date().getTime()}.png`;
+    link.href = result.canvas.toDataURL();
     link.click();
     
     // 关闭弹窗
@@ -663,10 +666,13 @@ function saveWithWhiteBackground() {
     // 绘制用户的画
     tempCtx.drawImage(drawingCanvas, 0, 0);
     
+    // 应用宽高比裁剪
+    const result = createAspectRatioCanvas(tempCanvas, true, 'white');
+    
     // 下载图片
     const link = document.createElement('a');
-    link.download = `康康画画_白底_${new Date().getTime()}.png`;
-    link.href = tempCanvas.toDataURL();
+    link.download = `康康画画_白底_${result.ratio.replace(':', 'x')}_${new Date().getTime()}.png`;
+    link.href = result.canvas.toDataURL();
     link.click();
     
     // 关闭弹窗
@@ -679,6 +685,106 @@ function closeSaveModal() {
     if (modal) {
         modal.classList.remove('show');
     }
+}
+
+// 支持的宽高比列表
+const SUPPORTED_RATIOS = [
+    { ratio: "1:1", value: 1 },
+    { ratio: "16:9", value: 16/9 },
+    { ratio: "21:9", value: 21/9 },
+    { ratio: "3:2", value: 3/2 },
+    { ratio: "2:3", value: 2/3 },
+    { ratio: "4:5", value: 4/5 },
+    { ratio: "5:4", value: 5/4 },
+    { ratio: "3:4", value: 3/4 },
+    { ratio: "4:3", value: 4/3 },
+    { ratio: "9:16", value: 9/16 },
+    { ratio: "9:21", value: 9/21 }
+];
+
+// 获取最接近的支持宽高比
+function getClosestAspectRatio(width, height) {
+    const currentRatio = width / height;
+    let closestRatio = SUPPORTED_RATIOS[0];
+    let minDiff = Math.abs(currentRatio - closestRatio.value);
+    
+    for (const ratio of SUPPORTED_RATIOS) {
+        const diff = Math.abs(currentRatio - ratio.value);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestRatio = ratio;
+        }
+    }
+    
+    return closestRatio;
+}
+
+// 计算裁剪区域以匹配目标宽高比
+function calculateCropArea(sourceWidth, sourceHeight, targetRatio) {
+    const currentRatio = sourceWidth / sourceHeight;
+    let cropX = 0, cropY = 0, cropWidth = sourceWidth, cropHeight = sourceHeight;
+    
+    if (currentRatio > targetRatio.value) {
+        // 图片太宽，需要裁剪左右
+        cropWidth = sourceHeight * targetRatio.value;
+        cropX = (sourceWidth - cropWidth) / 2;
+    } else if (currentRatio < targetRatio.value) {
+        // 图片太高，需要裁剪上下
+        cropHeight = sourceWidth / targetRatio.value;
+        cropY = (sourceHeight - cropHeight) / 2;
+    }
+    
+    return {
+        x: Math.round(cropX),
+        y: Math.round(cropY),
+        width: Math.round(cropWidth),
+        height: Math.round(cropHeight)
+    };
+}
+
+// 创建符合比例的画布
+function createAspectRatioCanvas(sourceCanvas, withBackground = false, backgroundColor = 'white') {
+    const sourceWidth = sourceCanvas.width;
+    const sourceHeight = sourceCanvas.height;
+    
+    // 获取最接近的支持宽高比
+    const targetRatio = getClosestAspectRatio(sourceWidth, sourceHeight);
+    
+    // 计算裁剪区域
+    const cropArea = calculateCropArea(sourceWidth, sourceHeight, targetRatio);
+    
+    // 创建新的画布
+    const outputCanvas = document.createElement('canvas');
+    
+    // 设置输出尺寸（保持合理的输出大小）
+    const maxSize = 1920; // 最大边长
+    if (cropArea.width > cropArea.height) {
+        outputCanvas.width = Math.min(cropArea.width, maxSize);
+        outputCanvas.height = outputCanvas.width / targetRatio.value;
+    } else {
+        outputCanvas.height = Math.min(cropArea.height, maxSize);
+        outputCanvas.width = outputCanvas.height * targetRatio.value;
+    }
+    
+    const outputCtx = outputCanvas.getContext('2d');
+    
+    // 如果需要背景，先填充背景
+    if (withBackground) {
+        outputCtx.fillStyle = backgroundColor;
+        outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+    }
+    
+    // 绘制裁剪后的图像
+    outputCtx.drawImage(
+        sourceCanvas,
+        cropArea.x, cropArea.y, cropArea.width, cropArea.height,
+        0, 0, outputCanvas.width, outputCanvas.height
+    );
+    
+    return {
+        canvas: outputCanvas,
+        ratio: targetRatio.ratio
+    };
 }
 
 // 将函数暴露到全局作用域
