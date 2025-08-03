@@ -213,6 +213,95 @@
             color: #333;
             backdrop-filter: blur(10px);
         }
+
+        .template-selector {
+            position: fixed;
+            top: 70px;
+            left: 20px;
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            max-width: 150px;
+        }
+
+        .template-selector h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .template-btn {
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            font-size: 24px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .template-btn:hover {
+            transform: scale(1.1);
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+
+        .template-btn.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea30 0%, #764ba230 100%);
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        @media (max-width: 768px) {
+            .template-selector {
+                top: auto;
+                bottom: 80px;
+                left: 10px;
+                max-width: 120px;
+                padding: 10px;
+            }
+
+            .template-grid {
+                gap: 5px;
+            }
+
+            .template-btn {
+                font-size: 20px;
+                padding: 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -227,6 +316,21 @@
     
     <div id="status" class="status" style="display: none;">
         手势检测已启动
+    </div>
+    
+    <div class="template-selector">
+        <h3>选择模板</h3>
+        <div class="template-grid" id="animalTemplates">
+            <!-- 动物模板将在这里动态生成 -->
+        </div>
+        <div class="template-grid" id="plantTemplates">
+            <!-- 植物模板将在这里动态生成 -->
+        </div>
+        <div class="mode-toggle">
+            <button class="mode-btn active" id="freeDrawBtn">自由画</button>
+            <button class="mode-btn" id="coloringBtn">填色</button>
+        </div>
+        <button class="control-btn" id="loadTemplateBtn" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 8px;">加载模板</button>
     </div>
     
     <div class="gesture-indicator">
@@ -260,6 +364,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js"></script>
+    <script src="templates.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

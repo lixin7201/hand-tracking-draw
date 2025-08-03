@@ -8,6 +8,10 @@ let brushSize = 5;
 let isErasing = false;
 let hands;
 let camera;
+let currentTemplate = null;
+let drawingMode = 'free'; // 'free' 或 'coloring'
+let templateCanvas, templateCtx;
+let coloringCanvas, coloringCtx;
 
 // 初始化
 window.addEventListener('DOMContentLoaded', async () => {
@@ -22,12 +26,19 @@ async function initializeApp() {
     drawingCtx = drawingCanvas.getContext('2d');
     handCtx = handCanvas.getContext('2d');
     
+    // 创建模板画布
+    templateCanvas = document.createElement('canvas');
+    templateCtx = templateCanvas.getContext('2d');
+    coloringCanvas = document.createElement('canvas');
+    coloringCtx = coloringCanvas.getContext('2d');
+    
     // 设置画布大小
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
     // 初始化控件
     initializeControls();
+    initializeTemplates();
     
     // 初始化MediaPipe Hands
     await initializeHandTracking();
@@ -44,6 +55,104 @@ function resizeCanvas() {
     drawingCanvas.height = height;
     handCanvas.width = width;
     handCanvas.height = height;
+    templateCanvas.width = width;
+    templateCanvas.height = height;
+    coloringCanvas.width = width;
+    coloringCanvas.height = height;
+    
+    // 重绘模板
+    if (currentTemplate) {
+        drawCurrentTemplate();
+    }
+}
+
+function initializeTemplates() {
+    const animalGrid = document.getElementById('animalTemplates');
+    const plantGrid = document.getElementById('plantTemplates');
+    
+    // 添加动物模板按钮
+    drawingTemplates.animals.forEach(template => {
+        const btn = document.createElement('button');
+        btn.className = 'template-btn';
+        btn.innerHTML = template.icon;
+        btn.title = template.name;
+        btn.onclick = () => selectTemplate(template);
+        animalGrid.appendChild(btn);
+    });
+    
+    // 添加植物模板按钮
+    drawingTemplates.plants.forEach(template => {
+        const btn = document.createElement('button');
+        btn.className = 'template-btn';
+        btn.innerHTML = template.icon;
+        btn.title = template.name;
+        btn.onclick = () => selectTemplate(template);
+        plantGrid.appendChild(btn);
+    });
+    
+    // 模式切换按钮
+    document.getElementById('freeDrawBtn').onclick = () => setDrawingMode('free');
+    document.getElementById('coloringBtn').onclick = () => setDrawingMode('coloring');
+    
+    // 加载模板按钮
+    document.getElementById('loadTemplateBtn').onclick = loadSelectedTemplate;
+}
+
+function selectTemplate(template) {
+    currentTemplate = template;
+    // 更新按钮样式
+    document.querySelectorAll('.template-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.title === template.name) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+function setDrawingMode(mode) {
+    drawingMode = mode;
+    document.getElementById('freeDrawBtn').classList.toggle('active', mode === 'free');
+    document.getElementById('coloringBtn').classList.toggle('active', mode === 'coloring');
+}
+
+function loadSelectedTemplate() {
+    if (!currentTemplate) {
+        alert('请先选择一个模板！');
+        return;
+    }
+    
+    // 清空画布
+    clearCanvas();
+    
+    // 绘制模板到画布
+    drawCurrentTemplate();
+}
+
+function drawCurrentTemplate() {
+    if (!currentTemplate) return;
+    
+    // 计算缩放比例以适应屏幕
+    const scale = Math.min(drawingCanvas.width / 800, drawingCanvas.height / 600);
+    
+    // 清空模板画布
+    templateCtx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
+    
+    // 保存当前状态
+    templateCtx.save();
+    
+    // 居中显示
+    const offsetX = (drawingCanvas.width - 800 * scale) / 2;
+    const offsetY = (drawingCanvas.height - 600 * scale) / 2;
+    templateCtx.translate(offsetX, offsetY);
+    
+    // 绘制模板
+    drawTemplate(templateCtx, currentTemplate, scale);
+    
+    // 恢复状态
+    templateCtx.restore();
+    
+    // 将模板复制到主画布
+    drawingCtx.drawImage(templateCanvas, 0, 0);
 }
 
 function initializeControls() {
@@ -234,25 +343,36 @@ function detectGestureAndDraw(landmarks) {
 }
 
 function draw(x, y) {
-    if (!isDrawing) {
-        isDrawing = true;
+    if (drawingMode === 'coloring' && currentTemplate) {
+        // 填色模式 - 使用较大的圆形画笔
+        drawingCtx.fillStyle = currentColor;
+        drawingCtx.globalCompositeOperation = 'multiply';
+        drawingCtx.beginPath();
+        drawingCtx.arc(x, y, brushSize * 2, 0, Math.PI * 2);
+        drawingCtx.fill();
+        drawingCtx.globalCompositeOperation = 'source-over';
+    } else {
+        // 自由绘画模式
+        if (!isDrawing) {
+            isDrawing = true;
+            lastX = x;
+            lastY = y;
+            return;
+        }
+        
+        drawingCtx.strokeStyle = currentColor;
+        drawingCtx.lineWidth = brushSize;
+        drawingCtx.lineCap = 'round';
+        drawingCtx.lineJoin = 'round';
+        
+        drawingCtx.beginPath();
+        drawingCtx.moveTo(lastX, lastY);
+        drawingCtx.lineTo(x, y);
+        drawingCtx.stroke();
+        
         lastX = x;
         lastY = y;
-        return;
     }
-    
-    drawingCtx.strokeStyle = currentColor;
-    drawingCtx.lineWidth = brushSize;
-    drawingCtx.lineCap = 'round';
-    drawingCtx.lineJoin = 'round';
-    
-    drawingCtx.beginPath();
-    drawingCtx.moveTo(lastX, lastY);
-    drawingCtx.lineTo(x, y);
-    drawingCtx.stroke();
-    
-    lastX = x;
-    lastY = y;
 }
 
 function eraseAt(x, y) {
@@ -266,6 +386,8 @@ function eraseAt(x, y) {
 
 function clearCanvas() {
     drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    coloringCtx.clearRect(0, 0, coloringCanvas.width, coloringCanvas.height);
+    templateCtx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
 }
 
 function saveDrawing() {
@@ -311,15 +433,26 @@ drawingCanvas.addEventListener('touchmove', (e) => {
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
     
-    drawingCtx.strokeStyle = currentColor;
-    drawingCtx.lineWidth = brushSize;
-    drawingCtx.lineCap = 'round';
-    drawingCtx.lineJoin = 'round';
-    
-    drawingCtx.beginPath();
-    drawingCtx.moveTo(touchLastX, touchLastY);
-    drawingCtx.lineTo(x, y);
-    drawingCtx.stroke();
+    if (drawingMode === 'coloring' && currentTemplate) {
+        // 填色模式
+        drawingCtx.fillStyle = currentColor;
+        drawingCtx.globalCompositeOperation = 'multiply';
+        drawingCtx.beginPath();
+        drawingCtx.arc(x, y, brushSize * 2, 0, Math.PI * 2);
+        drawingCtx.fill();
+        drawingCtx.globalCompositeOperation = 'source-over';
+    } else {
+        // 自由绘画模式
+        drawingCtx.strokeStyle = currentColor;
+        drawingCtx.lineWidth = brushSize;
+        drawingCtx.lineCap = 'round';
+        drawingCtx.lineJoin = 'round';
+        
+        drawingCtx.beginPath();
+        drawingCtx.moveTo(touchLastX, touchLastY);
+        drawingCtx.lineTo(x, y);
+        drawingCtx.stroke();
+    }
     
     touchLastX = x;
     touchLastY = y;
@@ -348,15 +481,26 @@ drawingCanvas.addEventListener('mousemove', (e) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    drawingCtx.strokeStyle = currentColor;
-    drawingCtx.lineWidth = brushSize;
-    drawingCtx.lineCap = 'round';
-    drawingCtx.lineJoin = 'round';
-    
-    drawingCtx.beginPath();
-    drawingCtx.moveTo(lastX, lastY);
-    drawingCtx.lineTo(x, y);
-    drawingCtx.stroke();
+    if (drawingMode === 'coloring' && currentTemplate) {
+        // 填色模式
+        drawingCtx.fillStyle = currentColor;
+        drawingCtx.globalCompositeOperation = 'multiply';
+        drawingCtx.beginPath();
+        drawingCtx.arc(x, y, brushSize * 2, 0, Math.PI * 2);
+        drawingCtx.fill();
+        drawingCtx.globalCompositeOperation = 'source-over';
+    } else {
+        // 自由绘画模式
+        drawingCtx.strokeStyle = currentColor;
+        drawingCtx.lineWidth = brushSize;
+        drawingCtx.lineCap = 'round';
+        drawingCtx.lineJoin = 'round';
+        
+        drawingCtx.beginPath();
+        drawingCtx.moveTo(lastX, lastY);
+        drawingCtx.lineTo(x, y);
+        drawingCtx.stroke();
+    }
     
     lastX = x;
     lastY = y;
