@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI转画功能测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .test-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .canvas-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+        }
+        
+        .status {
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .result-display {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .result-item {
+            text-align: center;
+        }
+        
+        .result-item img {
+            max-width: 400px;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        
+        select, textarea {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .test-log {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .warning {
+            color: orange;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 AI转画功能测试页面</h1>
+    
+    <div class="test-section">
+        <h2>1. 绘制测试涂鸦</h2>
+        <p>在下面的画布上绘制简单的涂鸦用于测试</p>
+        <div class="canvas-container">
+            <canvas id="testCanvas" width="400" height="400"></canvas>
+        </div>
+        <div class="test-controls">
+            <button onclick="clearCanvas()">清空画布</button>
+            <button onclick="drawTestDoodle()">生成测试涂鸦</button>
+            <button onclick="loadSampleImage()">加载示例图片</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. API测试</h2>
+        
+        <div style="margin: 15px 0;">
+            <label>选择艺术风格：</label>
+            <select id="styleSelect">
+                <option value="watercolor">水彩画</option>
+                <option value="ghibli">吉卜力</option>
+                <option value="manga">漫画</option>
+                <option value="oil">油画</option>
+                <option value="realistic">写实</option>
+            </select>
+        </div>
+        
+        <div style="margin: 15px 0;">
+            <label>涂鸦描述（可选）：</label>
+            <textarea id="descriptionInput" rows="3" placeholder="描述你的涂鸦内容..."></textarea>
+        </div>
+        
+        <div class="test-controls">
+            <button onclick="testGeminiAPI()">测试Gemini分析</button>
+            <button onclick="testFluxPrompt()">测试提示词生成</button>
+            <button onclick="testFullTransform()">完整转换测试</button>
+        </div>
+        
+        <div class="status" id="testStatus">
+            测试状态将在这里显示...
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 测试结果</h2>
+        <div id="resultContainer" class="result-display">
+            <!-- 结果将在这里显示 -->
+        </div>
+        <div class="test-log" id="testLog">
+            测试日志...
+        </div>
+    </div>
+    
+    <script src="ai-transform.js"></script>
+    <script>
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        
+        // 初始化画布
+        function initCanvas() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 鼠标绘制事件
+            canvas.addEventListener('mousedown', (e) => {
+                isDrawing = true;
+                const rect = canvas.getBoundingClientRect();
+                lastX = e.clientX - rect.left;
+                lastY = e.clientY - rect.top;
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                
+                lastX = x;
+                lastY = y;
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isDrawing = false;
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                isDrawing = false;
+            });
+        }
+        
+        // 清空画布
+        function clearCanvas() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            log('画布已清空', 'success');
+        }
+        
+        // 生成测试涂鸦
+        function drawTestDoodle() {
+            clearCanvas();
+            
+            // 画一个简单的笑脸
+            ctx.strokeStyle = '#FFD700';
+            ctx.fillStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            
+            // 脸
+            ctx.beginPath();
+            ctx.arc(200, 200, 100, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fill();
+            
+            // 眼睛
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(170, 180, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(230, 180, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 嘴巴
+            ctx.strokeStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(200, 210, 40, 0, Math.PI);
+            ctx.stroke();
+            
+            // 添加一些涂鸦元素
+            ctx.strokeStyle = '#FF6B6B';
+            ctx.beginPath();
+            ctx.moveTo(50, 50);
+            ctx.lineTo(80, 90);
+            ctx.lineTo(40, 90);
+            ctx.closePath();
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#4ECDC4';
+            ctx.beginPath();
+            ctx.rect(320, 50, 50, 50);
+            ctx.stroke();
+            
+            log('测试涂鸦已生成', 'success');
+        }
+        
+        // 加载示例图片
+        function loadSampleImage() {
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                log('示例图片已加载', 'success');
+            };
+            img.onerror = function() {
+                log('示例图片加载失败', 'error');
+                drawTestDoodle();
+            };
+            // 使用一个简单的数据URL作为示例
+            img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+        }
+        
+        // 日志记录
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            logDiv.innerHTML += `[${timestamp}] <span class="${className}">${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            // 同时更新状态
+            const statusDiv = document.getElementById('testStatus');
+            statusDiv.innerHTML = `最新状态: ${message}`;
+        }
+        
+        // 测试Gemini API
+        async function testGeminiAPI() {
+            log('开始测试Gemini API...');
+            
+            try {
+                const imageDataUrl = canvas.toDataURL('image/png');
+                const description = document.getElementById('descriptionInput').value;
+                
+                log('正在分析涂鸦内容...');
+                const analysis = await window.ArtTransform.analyzeDoodleContent(imageDataUrl, description);
+                
+                log('Gemini分析成功！', 'success');
+                log('分析结果: ' + analysis);
+                
+                return analysis;
+            } catch (error) {
+                log('Gemini API测试失败: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        // 测试Flux提示词生成
+        async function testFluxPrompt() {
+            log('开始测试Flux提示词生成...');
+            
+            try {
+                const imageDataUrl = canvas.toDataURL('image/png');
+                const style = document.getElementById('styleSelect').value;
+                
+                // 先进行分析
+                const analysis = await testGeminiAPI();
+                if (!analysis) return;
+                
+                log('正在生成Flux提示词...');
+                const prompt = await window.ArtTransform.generateFluxPrompt(analysis, style, imageDataUrl);
+                
+                log('提示词生成成功！', 'success');
+                log('生成的提示词: ' + prompt);
+                
+                return prompt;
+            } catch (error) {
+                log('Flux提示词生成失败: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        // 完整转换测试
+        async function testFullTransform() {
+            log('开始完整转换测试...');
+            
+            const resultContainer = document.getElementById('resultContainer');
+            resultContainer.innerHTML = '<p>正在处理，请稍候...</p>';
+            
+            try {
+                const style = document.getElementById('styleSelect').value;
+                const description = document.getElementById('descriptionInput').value;
+                
+                const result = await window.ArtTransform.transformDoodleToArt(
+                    canvas,
+                    style,
+                    description,
+                    (status) => {
+                        log('进度: ' + status);
+                    }
+                );
+                
+                log('转换成功！', 'success');
+                log('分析: ' + result.analysis);
+                log('提示词: ' + result.prompt);
+                
+                // 显示结果
+                resultContainer.innerHTML = `
+                    <div class="result-item">
+                        <h3>原始涂鸦</h3>
+                        <img src="${result.originalImage}" alt="原始涂鸦">
+                    </div>
+                    <div class="result-item">
+                        <h3>${result.style}风格</h3>
+                        <img src="${result.artworkUrl}" alt="转换后的艺术作品">
+                    </div>
+                `;
+                
+            } catch (error) {
+                log('完整转换测试失败: ' + error.message, 'error');
+                console.error(error);
+                resultContainer.innerHTML = '<p style="color: red;">转换失败，请查看控制台了解详情</p>';
+            }
+        }
+        
+        // 初始化
+        initCanvas();
+        drawTestDoodle();
+        log('测试页面已加载', 'success');
+    </script>
+</body>
+</html>

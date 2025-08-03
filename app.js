@@ -13,6 +13,7 @@ let drawingMode = 'free'; // 'free' 或 'coloring'
 let templateCanvas, templateCtx;
 let coloringCanvas, coloringCtx;
 let hasStartedDrawing = false; // 跟踪是否开始画画
+let selectedStyle = null; // AI转画选中的样式
 
 // 鼠标模式相关变量
 let mouseCursor = null;
@@ -27,8 +28,24 @@ let hoveredElement = null;
 let smoothPosition = { x: 0, y: 0 };
 let positionHistory = [];
 
-// 初始化
-window.addEventListener('DOMContentLoaded', async () => {
+// 初始化 - 使用load确保所有资源都加载完成
+window.addEventListener('load', async () => {
+    console.log('Window loaded, checking ArtTransform...');
+    
+    // 确保ArtTransform已加载
+    let attempts = 0;
+    while (!window.ArtTransform && attempts < 10) {
+        console.log('Waiting for ArtTransform to load...');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+    }
+    
+    if (window.ArtTransform) {
+        console.log('ArtTransform loaded successfully');
+    } else {
+        console.error('ArtTransform failed to load after 10 attempts');
+    }
+    
     await initializeApp();
 });
 
@@ -54,6 +71,10 @@ async function initializeApp() {
     initializeControls();
     initializeTemplates();
     initializeMouseCursor();
+    
+    // 初始化触摸和鼠标事件
+    initializeTouchEvents();
+    initializeMouseEvents();
     
     // 初始化MediaPipe Hands
     await initializeHandTracking();
@@ -195,6 +216,42 @@ function initializeControls() {
     
     // 保存按钮
     document.getElementById('saveBtn').addEventListener('click', saveDrawing);
+    
+    // AI转画按钮
+    const transformBtn = document.getElementById('transformBtn');
+    if (transformBtn) {
+        console.log('Transform button found, adding click listener');
+        transformBtn.addEventListener('click', function(e) {
+            console.log('Transform button clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            openTransformModal();
+        });
+        
+        // 添加一个测试点击
+        transformBtn.onclick = function() {
+            console.log('Transform button onclick triggered');
+        };
+    } else {
+        console.error('Transform button not found!');
+    }
+    
+    // 初始化AI转画功能 - 确保在DOM和脚本都准备好后
+    if (document.readyState === 'complete') {
+        // 如果页面已经完全加载
+        setTimeout(() => {
+            console.log('Initializing AI Transform from initializeControls...');
+            initializeAITransform();
+        }, 500);
+    } else {
+        // 等待页面完全加载
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('Initializing AI Transform from load event...');
+                initializeAITransform();
+            }, 500);
+        });
+    }
 }
 
 async function initializeHandTracking() {
@@ -797,7 +854,14 @@ let touchDrawing = false;
 let touchLastX = 0;
 let touchLastY = 0;
 
-drawingCanvas.addEventListener('touchstart', (e) => {
+// 初始化触摸事件（需要在drawingCanvas初始化后调用）
+function initializeTouchEvents() {
+    if (!drawingCanvas) {
+        console.error('drawingCanvas not initialized for touch events');
+        return;
+    }
+    
+    drawingCanvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     const rect = drawingCanvas.getBoundingClientRect();
@@ -846,15 +910,23 @@ drawingCanvas.addEventListener('touchmove', (e) => {
     touchLastY = y;
 }, { passive: false });
 
-drawingCanvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    touchDrawing = false;
-}, { passive: false });
+    drawingCanvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        touchDrawing = false;
+    }, { passive: false });
+}
 
 // 添加鼠标事件支持（用于没有摄像头的情况）
 let mouseDrawing = false;
 
-drawingCanvas.addEventListener('mousedown', (e) => {
+// 初始化鼠标事件（需要在drawingCanvas初始化后调用）
+function initializeMouseEvents() {
+    if (!drawingCanvas) {
+        console.error('drawingCanvas not initialized for mouse events');
+        return;
+    }
+    
+    drawingCanvas.addEventListener('mousedown', (e) => {
     const rect = drawingCanvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
     lastY = e.clientY - rect.top;
@@ -900,15 +972,16 @@ drawingCanvas.addEventListener('mousemove', (e) => {
     lastY = y;
 });
 
-drawingCanvas.addEventListener('mouseup', () => {
-    mouseDrawing = false;
-    drawingCanvas.style.pointerEvents = 'none';
-});
+    drawingCanvas.addEventListener('mouseup', () => {
+        mouseDrawing = false;
+        drawingCanvas.style.pointerEvents = 'none';
+    });
 
-drawingCanvas.addEventListener('mouseleave', () => {
-    mouseDrawing = false;
-    drawingCanvas.style.pointerEvents = 'none';
-});
+    drawingCanvas.addEventListener('mouseleave', () => {
+        mouseDrawing = false;
+        drawingCanvas.style.pointerEvents = 'none';
+    });
+}
 
 // 鼠标模式相关函数
 function initializeMouseCursor() {
@@ -1238,3 +1311,213 @@ function showSiteTitle() {
         title.classList.remove('hidden');
     }
 }
+
+// AI转画功能相关函数
+
+function initializeAITransform() {
+    console.log('Initializing AI Transform...');
+    
+    // 生成样式选项
+    const styleGrid = document.getElementById('styleGrid');
+    if (!styleGrid) {
+        console.error('Style grid element not found');
+        return;
+    }
+    
+    if (!window.ArtTransform) {
+        console.error('ArtTransform not loaded');
+        return;
+    }
+    
+    // 清空现有内容（避免重复）
+    styleGrid.innerHTML = '';
+    
+    Object.entries(window.ArtTransform.ART_STYLES).forEach(([key, style]) => {
+        const styleOption = document.createElement('div');
+        styleOption.className = 'style-option';
+        styleOption.dataset.style = key;
+        styleOption.innerHTML = `
+            <div class="style-option-icon">${style.icon}</div>
+            <div class="style-option-name">${style.name}</div>
+            <div class="style-option-desc">${style.description}</div>
+        `;
+        
+        // 使用addEventListener而不是onclick确保事件绑定
+        styleOption.addEventListener('click', function() {
+            console.log('Style clicked:', key);
+            selectArtStyle(key);
+        });
+        
+        styleGrid.appendChild(styleOption);
+    });
+    
+    console.log('Style options created:', styleGrid.children.length);
+    
+    // 绑定转换按钮
+    const startTransformBtn = document.getElementById('startTransformBtn');
+    if (startTransformBtn) {
+        startTransformBtn.addEventListener('click', startTransformation);
+    }
+    
+    // 绑定结果弹窗按钮
+    const saveResultBtn = document.getElementById('saveResultBtn');
+    if (saveResultBtn) {
+        saveResultBtn.addEventListener('click', saveTransformResult);
+    }
+    
+    const tryAgainBtn = document.getElementById('tryAgainBtn');
+    if (tryAgainBtn) {
+        tryAgainBtn.addEventListener('click', () => {
+            closeResultModal();
+            openTransformModal();
+        });
+    }
+}
+
+function openTransformModal() {
+    console.log('Opening transform modal...');
+    const modal = document.getElementById('transformModal');
+    
+    if (!modal) {
+        console.error('Transform modal element not found!');
+        return;
+    }
+    
+    modal.classList.add('show');
+    console.log('Modal shown');
+    
+    // 重置选择
+    selectedStyle = null;
+    document.querySelectorAll('.style-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    
+    const descInput = document.getElementById('doodleDescription');
+    if (descInput) {
+        descInput.value = '';
+    }
+    
+    // 如果样式还没有初始化，现在初始化
+    const styleGrid = document.getElementById('styleGrid');
+    if (styleGrid && styleGrid.children.length === 0) {
+        console.log('Style grid empty, initializing now...');
+        initializeAITransform();
+    }
+}
+
+function closeTransformModal() {
+    const modal = document.getElementById('transformModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+function selectArtStyle(style) {
+    console.log('Selecting style:', style);
+    selectedStyle = style;
+    
+    // 更新所有样式选项的选中状态
+    document.querySelectorAll('.style-option').forEach(opt => {
+        opt.classList.remove('selected');
+        if (opt.dataset.style === style) {
+            opt.classList.add('selected');
+            console.log('Style selected:', style);
+        }
+    });
+}
+
+async function startTransformation() {
+    console.log('Starting transformation with style:', selectedStyle);
+    
+    if (!selectedStyle) {
+        alert('请先选择一个艺术风格！');
+        return;
+    }
+    
+    const description = document.getElementById('doodleDescription').value;
+    console.log('Description:', description || 'No description provided');
+    const progressDiv = document.getElementById('transformProgress');
+    const progressText = document.getElementById('progressText');
+    const startBtn = document.getElementById('startTransformBtn');
+    
+    // 显示进度
+    progressDiv.style.display = 'block';
+    startBtn.disabled = true;
+    
+    try {
+        // 合并画布（包含用户的涂鸦）
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = drawingCanvas.width;
+        tempCanvas.height = drawingCanvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // 白色背景
+        tempCtx.fillStyle = 'white';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // 绘制用户的画
+        tempCtx.drawImage(drawingCanvas, 0, 0);
+        
+        // 调用AI转换
+        const result = await window.ArtTransform.transformDoodleToArt(
+            tempCanvas,
+            selectedStyle,
+            description,
+            (status) => {
+                progressText.textContent = status;
+            }
+        );
+        
+        // 显示结果
+        showTransformResult(result);
+        
+        // 关闭转换弹窗
+        closeTransformModal();
+        
+    } catch (error) {
+        console.error('Transformation error:', error);
+        alert('转换失败: ' + error.message);
+    } finally {
+        progressDiv.style.display = 'none';
+        startBtn.disabled = false;
+        progressText.textContent = '正在准备...';
+    }
+}
+
+function showTransformResult(result) {
+    const resultModal = document.getElementById('resultModal');
+    const originalImage = document.getElementById('originalImage');
+    const transformedImage = document.getElementById('transformedImage');
+    const styleTitle = document.getElementById('resultStyleTitle');
+    
+    if (resultModal && originalImage && transformedImage) {
+        originalImage.src = result.originalImage;
+        transformedImage.src = result.artworkUrl;
+        styleTitle.textContent = result.style + '风格';
+        
+        resultModal.classList.add('show');
+        
+        // 保存结果到全局变量以便保存
+        window.currentTransformResult = result;
+    }
+}
+
+function closeResultModal() {
+    const modal = document.getElementById('resultModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+function saveTransformResult() {
+    if (!window.currentTransformResult) return;
+    
+    const link = document.createElement('a');
+    link.download = `康康画画_AI艺术_${window.currentTransformResult.style}_${new Date().getTime()}.png`;
+    link.href = window.currentTransformResult.artworkUrl;
+    link.click();
+}
+
+// 将函数暴露到全局作用域
+window.closeTransformModal = closeTransformModal;
+window.closeResultModal = closeResultModal;

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AI转画调试测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            margin: 10px 0;
+        }
+        .result-img {
+            max-width: 400px;
+            margin: 10px;
+            border: 2px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI转画功能调试测试</h1>
+    
+    <canvas id="canvas" width="300" height="300"></canvas>
+    
+    <div>
+        <button onclick="drawSample()">生成示例涂鸦</button>
+        <button onclick="testDirect()">测试直接API调用</button>
+        <button onclick="testProxy()">测试代理API调用</button>
+        <button onclick="testFullFlow()">测试完整流程</button>
+    </div>
+    
+    <div id="log" class="log">日志输出...</div>
+    
+    <div id="results"></div>
+    
+    <script src="image-upload.js"></script>
+    <script src="ai-transform.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const logDiv = document.getElementById('log');
+        const resultsDiv = document.getElementById('results');
+        
+        function log(msg, data = null) {
+            const timestamp = new Date().toISOString().substr(11, 8);
+            let logMsg = `[${timestamp}] ${msg}`;
+            if (data) {
+                logMsg += '\n' + JSON.stringify(data, null, 2);
+            }
+            logDiv.textContent += logMsg + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(msg, data);
+        }
+        
+        function drawSample() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 画个简单的笑脸
+            ctx.strokeStyle = '#FFD700';
+            ctx.fillStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            
+            ctx.beginPath();
+            ctx.arc(150, 150, 60, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fill();
+            
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(130, 140, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(170, 140, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(150, 160, 20, 0, Math.PI);
+            ctx.stroke();
+            
+            log('示例涂鸦已生成');
+        }
+        
+        async function testDirect() {
+            log('开始测试直接API调用...');
+            
+            try {
+                const dataUrl = canvas.toDataURL('image/png');
+                
+                // 1. 测试Gemini分析
+                log('调用Gemini分析...');
+                const analysis = await window.ArtTransform.analyzeDoodleContent(dataUrl, '');
+                log('Gemini分析结果:', analysis);
+                
+                // 2. 生成Flux提示词
+                log('生成Flux提示词...');
+                const prompt = await window.ArtTransform.generateFluxPrompt(analysis, 'watercolor', dataUrl);
+                log('Flux提示词:', prompt);
+                
+                // 3. 上传图片获取公共URL
+                log('上传图片到公共存储...');
+                const publicUrl = await window.ImageUpload.uploadImageToPublic(dataUrl);
+                log('公共URL:', publicUrl);
+                
+                // 4. 调用Flux生成
+                log('调用Flux生成艺术画...');
+                const artworkUrl = await window.ArtTransform.generateArtWithFlux(publicUrl, prompt);
+                log('艺术画URL:', artworkUrl);
+                
+                // 显示结果
+                if (artworkUrl) {
+                    const img = document.createElement('img');
+                    img.src = artworkUrl;
+                    img.className = 'result-img';
+                    resultsDiv.appendChild(img);
+                }
+                
+            } catch (error) {
+                log('错误:', error.message);
+                console.error(error);
+            }
+        }
+        
+        async function testProxy() {
+            log('开始测试代理API调用...');
+            
+            try {
+                const dataUrl = canvas.toDataURL('image/png');
+                
+                // 测试代理服务器健康状态
+                const healthResp = await fetch('http://localhost:3001/health');
+                const health = await healthResp.json();
+                log('代理服务器状态:', health);
+                
+                // 1. 通过代理调用Gemini
+                log('通过代理调用Gemini...');
+                const analyzeResp = await fetch('http://localhost:3001/api/analyze-doodle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageDataUrl: dataUrl,
+                        description: '一个笑脸'
+                    })
+                });
+                const analyzeData = await analyzeResp.json();
+                log('代理Gemini响应:', analyzeData);
+                
+                if (!analyzeData.success) {
+                    throw new Error('Gemini分析失败: ' + analyzeData.error);
+                }
+                
+                // 2. 通过代理生成提示词
+                log('通过代理生成提示词...');
+                const promptResp = await fetch('http://localhost:3001/api/generate-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analysis: analyzeData.analysis,
+                        style: 'watercolor painting, soft colors, artistic',
+                        imageDataUrl: dataUrl
+                    })
+                });
+                const promptData = await promptResp.json();
+                log('代理提示词响应:', promptData);
+                
+                if (!promptData.success) {
+                    throw new Error('提示词生成失败: ' + promptData.error);
+                }
+                
+                // 3. 上传图片
+                log('上传图片...');
+                const publicUrl = await window.ImageUpload.uploadImageToPublic(dataUrl);
+                log('公共URL:', publicUrl);
+                
+                // 4. 通过代理调用Flux
+                log('通过代理调用Flux生成...');
+                const artResp = await fetch('http://localhost:3001/api/generate-art', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageUrl: publicUrl,
+                        prompt: promptData.prompt,
+                        promptStrength: 0.8
+                    })
+                });
+                const artData = await artResp.json();
+                log('代理Flux响应:', artData);
+                
+                if (artData.success && artData.artworkUrl) {
+                    const img = document.createElement('img');
+                    img.src = artData.artworkUrl;
+                    img.className = 'result-img';
+                    resultsDiv.appendChild(img);
+                }
+                
+            } catch (error) {
+                log('错误:', error.message);
+                console.error(error);
+            }
+        }
+        
+        async function testFullFlow() {
+            log('开始测试完整流程...');
+            
+            try {
+                const result = await window.ArtTransform.transformDoodleToArt(
+                    canvas,
+                    'watercolor',
+                    '一个快乐的笑脸',
+                    (status) => log('进度:', status)
+                );
+                
+                log('转换完成:', result);
+                
+                if (result.artworkUrl) {
+                    const img = document.createElement('img');
+                    img.src = result.artworkUrl;
+                    img.className = 'result-img';
+                    resultsDiv.appendChild(img);
+                }
+                
+            } catch (error) {
+                log('错误:', error.message);
+                console.error(error);
+            }
+        }
+        
+        // 初始化
+        drawSample();
+        log('调试页面已准备就绪');
+        log('API配置:', {
+            useProxy: window.ArtTransform ? API_CONFIG.useProxy : 'ArtTransform not loaded',
+            proxyUrl: API_CONFIG ? API_CONFIG.proxyUrl : 'CONFIG not loaded'
+        });
+    </script>
+</body>
+</html>

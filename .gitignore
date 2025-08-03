@@ -3,3 +3,16 @@ node_modules/
 .vercel
 *.log
 .env.local
+
+# PID files
+*.pid
+.api.pid
+.web.pid
+
+# API server logs
+api-server.log
+web-server.log
+
+# Temporary files
+uploads/
+tmp/
