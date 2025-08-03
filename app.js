@@ -183,20 +183,29 @@ function initializeControls() {
 }
 
 async function initializeHandTracking() {
-    hands = new Hands({
-        locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
-        }
-    });
-    
-    hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.5
-    });
-    
-    hands.onResults(onHandResults);
+    try {
+        // 检测是否为移动设备
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        hands = new Hands({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+            }
+        });
+        
+        // 移动端使用更低的复杂度以提高性能
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: isMobile ? 0 : 1, // 移动端使用简单模型
+            minDetectionConfidence: isMobile ? 0.5 : 0.7,
+            minTrackingConfidence: isMobile ? 0.3 : 0.5
+        });
+        
+        hands.onResults(onHandResults);
+    } catch (error) {
+        console.error('MediaPipe Hands 初始化失败:', error);
+        document.getElementById('loading').textContent = 'MediaPipe 初始化失败，仅支持触摸/鼠标绘画';
+    }
 }
 
 async function startCamera() {
@@ -204,29 +213,71 @@ async function startCamera() {
     const status = document.getElementById('status');
     
     try {
-        // 请求摄像头权限
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user'
-            }
-        });
+        // 检测是否为移动设备
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
+        loading.textContent = '正在启动摄像头...';
+        
+        // 为移动设备优化的摄像头配置
+        const constraints = {
+            video: isMobile ? {
+                facingMode: 'environment', // 移动端优先使用后置摄像头
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            } : {
+                facingMode: 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        };
+        
+        // 请求摄像头权限
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (firstError) {
+            console.log('首次尝试失败，使用备用配置:', firstError);
+            // 如果失败，尝试更简单的配置
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            });
+        }
+        
+        // 设置视频流
         video.srcObject = stream;
         
-        camera = new Camera(video, {
-            onFrame: async () => {
-                await hands.send({ image: video });
-            },
-            width: 1280,
-            height: 720
+        // 等待视频元数据加载
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play();
+                resolve();
+            };
         });
         
-        camera.start();
+        // 初始化MediaPipe Camera
+        if (window.Camera) {
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    if (hands && video.readyState === 4) {
+                        await hands.send({ image: video });
+                    }
+                },
+                width: isMobile ? 640 : 1280,
+                height: isMobile ? 480 : 720
+            });
+            
+            camera.start();
+        } else {
+            // 如果Camera不可用，使用备用方法
+            console.log('MediaPipe Camera 不可用，使用备用方法');
+            startAlternativeTracking();
+        }
         
         loading.style.display = 'none';
         status.style.display = 'block';
+        status.textContent = isMobile ? '手机摄像头已启动' : '手势检测已启动';
         
         setTimeout(() => {
             status.style.display = 'none';
@@ -234,8 +285,31 @@ async function startCamera() {
         
     } catch (error) {
         console.error('摄像头访问失败:', error);
-        loading.textContent = '摄像头访问失败，请检查权限设置';
+        loading.innerHTML = `
+            <div style="text-align: center;">
+                <p>摄像头访问失败</p>
+                <p style="font-size: 14px; margin-top: 10px;">错误: ${error.message}</p>
+                <p style="font-size: 12px; margin-top: 10px;">
+                    请检查：<br>
+                    1. 是否允许摄像头权限<br>
+                    2. 是否使用HTTPS访问<br>
+                    3. 浏览器是否支持
+                </p>
+                <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 10px; cursor: pointer;">重试</button>
+            </div>
+        `;
     }
+}
+
+// 备用的追踪方法（当MediaPipe Camera不可用时）
+function startAlternativeTracking() {
+    const processFrame = async () => {
+        if (hands && video.readyState === 4) {
+            await hands.send({ image: video });
+        }
+        requestAnimationFrame(processFrame);
+    };
+    processFrame();
 }
 
 function onHandResults(results) {
