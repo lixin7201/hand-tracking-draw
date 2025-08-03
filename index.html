@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>手势画图应用</title>
+    <title>康康画画机 - 儿童手势绘画</title>
     <style>
         * {
             margin: 0;
@@ -204,6 +204,95 @@
             }
         }
 
+        .site-title {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            font-size: 48px;
+            font-weight: 900;
+            font-family: 'Comic Sans MS', '华文彩云', '幼圆', cursive;
+            text-align: center;
+            pointer-events: none;
+            transition: all 0.5s ease;
+            filter: drop-shadow(3px 3px 0 rgba(0,0,0,0.2));
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        .site-title.hidden {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-100px);
+        }
+
+        .char1 { color: #FF6B6B; animation: wiggle 3s ease-in-out infinite; }
+        .char2 { color: #4ECDC4; animation: wiggle 3s ease-in-out infinite 0.1s; }
+        .char3 { color: #45B7D1; animation: wiggle 3s ease-in-out infinite 0.2s; }
+        .char4 { color: #FFA07A; animation: wiggle 3s ease-in-out infinite 0.3s; }
+        .char5 { color: #98D8C8; animation: wiggle 3s ease-in-out infinite 0.4s; }
+        .char6 { color: #F7DC6F; animation: wiggle 3s ease-in-out infinite 0.5s; }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-10px); }
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-5deg) scale(1.1); }
+            75% { transform: rotate(5deg) scale(1.1); }
+        }
+
+        @keyframes rainbow {
+            0% { color: #FF6B6B; }
+            16% { color: #FFA07A; }
+            33% { color: #F7DC6F; }
+            50% { color: #98D8C8; }
+            66% { color: #4ECDC4; }
+            83% { color: #45B7D1; }
+            100% { color: #FF6B6B; }
+        }
+
+        .site-title .decoration {
+            position: absolute;
+            font-size: 24px;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .star1 {
+            top: -20px;
+            left: -30px;
+            animation-delay: 0s;
+        }
+
+        .star2 {
+            top: -15px;
+            right: -25px;
+            animation-delay: 1s;
+        }
+
+        .star3 {
+            bottom: -15px;
+            left: 20px;
+            animation-delay: 2s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(180deg); }
+        }
+
+        @media (max-width: 768px) {
+            .site-title {
+                font-size: 32px;
+                top: 20px;
+            }
+            
+            .site-title .decoration {
+                font-size: 18px;
+            }
+        }
+
         .loading {
             position: fixed;
             top: 50%;
@@ -310,6 +399,18 @@
     </style>
 </head>
 <body>
+    <!-- 网站标题 -->
+    <div id="siteTitle" class="site-title">
+        <span class="decoration star1">✨</span>
+        <span class="char1">康</span>
+        <span class="char2">康</span>
+        <span class="char3">画</span>
+        <span class="char4">画</span>
+        <span class="char5">机</span>
+        <span class="decoration star2">🌈</span>
+        <span class="decoration star3">⭐</span>
+    </div>
+    
     <div id="loading" class="loading">正在加载摄像头...</div>
     
     <div id="videoContainer">

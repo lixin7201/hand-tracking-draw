@@ -12,6 +12,7 @@ let currentTemplate = null;
 let drawingMode = 'free'; // 'free' 或 'coloring'
 let templateCanvas, templateCtx;
 let coloringCanvas, coloringCtx;
+let hasStartedDrawing = false; // 跟踪是否开始画画
 
 // 鼠标模式相关变量
 let mouseCursor = null;
@@ -558,6 +559,12 @@ function detectGestureAndDraw(landmarks) {
 }
 
 function draw(x, y) {
+    // 首次画画时隐藏标题
+    if (!hasStartedDrawing) {
+        hasStartedDrawing = true;
+        hideSiteTitle();
+    }
+    
     if (drawingMode === 'coloring' && currentTemplate) {
         // 填色模式 - 使用较大的圆形画笔
         drawingCtx.fillStyle = currentColor;
@@ -603,6 +610,10 @@ function clearCanvas() {
     drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
     coloringCtx.clearRect(0, 0, coloringCanvas.width, coloringCanvas.height);
     templateCtx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
+    
+    // 清空画布后显示标题
+    hasStartedDrawing = false;
+    showSiteTitle();
 }
 
 function saveDrawing() {
@@ -637,6 +648,12 @@ drawingCanvas.addEventListener('touchstart', (e) => {
     touchLastX = touch.clientX - rect.left;
     touchLastY = touch.clientY - rect.top;
     touchDrawing = true;
+    
+    // 首次触摸时隐藏标题
+    if (!hasStartedDrawing) {
+        hasStartedDrawing = true;
+        hideSiteTitle();
+    }
 }, { passive: false });
 
 drawingCanvas.addEventListener('touchmove', (e) => {
@@ -687,6 +704,12 @@ drawingCanvas.addEventListener('mousedown', (e) => {
     lastY = e.clientY - rect.top;
     mouseDrawing = true;
     drawingCanvas.style.pointerEvents = 'auto';
+    
+    // 首次鼠标绘画时隐藏标题
+    if (!hasStartedDrawing) {
+        hasStartedDrawing = true;
+        hideSiteTitle();
+    }
 });
 
 drawingCanvas.addEventListener('mousemove', (e) => {
@@ -1042,4 +1065,20 @@ function unhighlightElement(element) {
     element.style.transform = '';
     element.style.boxShadow = '';
     element.style.zIndex = '';
+}
+
+// 隐藏网站标题
+function hideSiteTitle() {
+    const title = document.getElementById('siteTitle');
+    if (title) {
+        title.classList.add('hidden');
+    }
+}
+
+// 显示网站标题
+function showSiteTitle() {
+    const title = document.getElementById('siteTitle');
+    if (title) {
+        title.classList.remove('hidden');
+    }
 }
