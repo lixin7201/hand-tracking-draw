@@ -14,14 +14,17 @@ let templateCanvas, templateCtx;
 let coloringCanvas, coloringCtx;
 
 // 鼠标模式相关变量
-let isMouseMode = false;
 let mouseCursor = null;
-let mouseTimer = null;
-let mouseHoldStartTime = null;
 let mousePosition = { x: 0, y: 0 };
-let lastMousePosition = { x: 0, y: 0 };
 let isPinching = false;
-let pinchReleaseTimer = null;
+let lastPinchDistance = 0;
+let pinchState = 'none'; // 'none', 'pinched', 'spread', 'clicking'
+let isDragging = false;
+let dragTarget = null;
+let dragStartValue = 0;
+let hoveredElement = null;
+let smoothPosition = { x: 0, y: 0 };
+let positionHistory = [];
 
 // 初始化
 window.addEventListener('DOMContentLoaded', async () => {
@@ -398,63 +401,113 @@ function detectGestureAndDraw(landmarks) {
     
     // 捏合阈值（像素）
     const pinchThreshold = 30;
+    const spreadThreshold = 60; // 张开阈值
     
-    // 检测捏合手势
+    // 检测手势状态
     if (pinchDistance < pinchThreshold) {
-        // 进入鼠标模式
+        // 手指捏合状态
         if (!isPinching) {
             isPinching = true;
-            mouseHoldStartTime = Date.now();
-            lastMousePosition = { x: indexTip.x * drawingCanvas.width, y: indexTip.y * drawingCanvas.height };
+            positionHistory = [];
+            
+            // 检测是否是从张开到捏合（点击手势）
+            if (pinchState === 'spread') {
+                // 触发点击
+                performClick();
+                pinchState = 'clicking';
+            } else {
+                pinchState = 'pinched';
+            }
         }
         
         // 更新鼠标位置（使用食指和拇指的中点）
-        mousePosition.x = ((indexTip.x + thumbTip.x) / 2) * drawingCanvas.width;
-        mousePosition.y = ((indexTip.y + thumbTip.y) / 2) * drawingCanvas.height;
+        const rawX = ((indexTip.x + thumbTip.x) / 2) * drawingCanvas.width;
+        const rawY = ((indexTip.y + thumbTip.y) / 2) * drawingCanvas.height;
+        
+        // 平滑处理
+        positionHistory.push({ x: rawX, y: rawY });
+        if (positionHistory.length > 3) { // 减少平滑帧数，提高响应
+            positionHistory.shift();
+        }
+        
+        // 计算平均位置
+        smoothPosition.x = positionHistory.reduce((sum, p) => sum + p.x, 0) / positionHistory.length;
+        smoothPosition.y = positionHistory.reduce((sum, p) => sum + p.y, 0) / positionHistory.length;
+        
+        // 查找并高亮附近元素
+        const nearbyElement = findNearbyClickableElement(smoothPosition.x, smoothPosition.y);
+        
+        if (nearbyElement) {
+            // 磁吸效果
+            const rect = nearbyElement.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const magnetStrength = 0.5; // 增强磁吸
+            
+            mousePosition.x = smoothPosition.x + (centerX - smoothPosition.x) * magnetStrength;
+            mousePosition.y = smoothPosition.y + (centerY - smoothPosition.y) * magnetStrength;
+            
+            if (hoveredElement !== nearbyElement) {
+                if (hoveredElement) unhighlightElement(hoveredElement);
+                hoveredElement = nearbyElement;
+                highlightElement(nearbyElement);
+            }
+        } else {
+            mousePosition.x = smoothPosition.x;
+            mousePosition.y = smoothPosition.y;
+            
+            if (hoveredElement) {
+                unhighlightElement(hoveredElement);
+                hoveredElement = null;
+            }
+        }
+        
+        // 处理拖拽
+        if (isDragging && dragTarget) {
+            handleDrag(mousePosition.x, mousePosition.y);
+        }
         
         // 显示鼠标光标
         showMouseCursor(mousePosition.x, mousePosition.y);
         
-        // 检查是否停留足够长时间
-        const holdDuration = Date.now() - mouseHoldStartTime;
-        const moveDistance = Math.sqrt(
-            Math.pow(mousePosition.x - lastMousePosition.x, 2) +
-            Math.pow(mousePosition.y - lastMousePosition.y, 2)
-        );
+        // 停止绘制
+        isDrawing = false;
+        isErasing = false;
+        lastPinchDistance = pinchDistance;
+        return;
         
-        // 如果移动距离小于10像素，认为是停留
-        if (moveDistance < 10) {
-            updateMouseTimer(holdDuration);
-            
-            // 停留2秒后准备点击
-            if (holdDuration >= 2000) {
-                mouseCursor.classList.add('ready-to-click');
-            }
-        } else {
-            // 移动了，重置计时器
-            mouseHoldStartTime = Date.now();
-            lastMousePosition = { x: mousePosition.x, y: mousePosition.y };
-            mouseCursor.classList.remove('ready-to-click');
-            hideMouseTimer();
-        }
+    } else if (pinchDistance > spreadThreshold && isPinching) {
+        // 手指张开状态
+        pinchState = 'spread';
+        lastPinchDistance = pinchDistance;
+        
+        // 保持鼠标显示
+        showMouseCursor(mousePosition.x, mousePosition.y);
+        updateCursorForSpread();
         
         // 停止绘制
         isDrawing = false;
         isErasing = false;
         return;
+        
     } else {
-        // 松开手指
+        // 退出鼠标模式
         if (isPinching) {
-            const holdDuration = Date.now() - mouseHoldStartTime;
+            // 结束拖拽
+            if (isDragging) {
+                endDrag();
+            }
             
-            // 如果已经停留超过2秒，触发点击
-            if (holdDuration >= 2000) {
-                triggerClick(mousePosition.x, mousePosition.y);
+            // 清理状态
+            if (hoveredElement) {
+                unhighlightElement(hoveredElement);
             }
             
             isPinching = false;
+            pinchState = 'none';
+            hoveredElement = null;
+            positionHistory = [];
             hideMouseCursor();
-            hideMouseTimer();
         }
     }
     
@@ -685,27 +738,27 @@ function initializeMouseCursor() {
         z-index: 1000;
         display: none;
         transform: translate(-50%, -50%);
-        transition: all 0.3s ease;
+        transition: all 0.15s ease;
     `;
     document.body.appendChild(mouseCursor);
     
-    // 创建计时器显示元素
-    const timerDisplay = document.createElement('div');
-    timerDisplay.id = 'mouseTimer';
-    timerDisplay.style.cssText = `
+    // 添加状态提示
+    const statusText = document.createElement('div');
+    statusText.id = 'mouseStatusText';
+    statusText.style.cssText = `
         position: absolute;
-        top: -35px;
+        top: -30px;
         left: 50%;
         transform: translateX(-50%);
-        background: rgba(102, 126, 234, 0.9);
+        background: rgba(0, 0, 0, 0.7);
         color: white;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 12px;
-        font-weight: bold;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        white-space: nowrap;
         display: none;
     `;
-    mouseCursor.appendChild(timerDisplay);
+    mouseCursor.appendChild(statusText);
     
     // 创建点击动画元素
     const clickAnimation = document.createElement('div');
@@ -741,87 +794,140 @@ function showMouseCursor(x, y) {
         mouseCursor.style.display = 'block';
         mouseCursor.style.left = x + 'px';
         mouseCursor.style.top = y + 'px';
+        
+        // 根据状态改变光标样式
+        if (hoveredElement) {
+            mouseCursor.style.width = '50px';
+            mouseCursor.style.height = '50px';
+            mouseCursor.style.borderColor = '#4CAF50';
+        } else {
+            mouseCursor.style.width = '40px';
+            mouseCursor.style.height = '40px';
+            mouseCursor.style.borderColor = '#667eea';
+        }
+        
+        if (isDragging) {
+            mouseCursor.style.borderWidth = '4px';
+            mouseCursor.style.borderColor = '#ff9800';
+        } else {
+            mouseCursor.style.borderWidth = '3px';
+        }
+    }
+}
+
+// 张开手指时的光标状态
+function updateCursorForSpread() {
+    if (mouseCursor) {
+        mouseCursor.style.width = '60px';
+        mouseCursor.style.height = '60px';
+        mouseCursor.style.borderColor = '#ffc107';
+        mouseCursor.style.borderWidth = '4px';
+        mouseCursor.style.borderStyle = 'dashed';
+        
+        // 显示状态提示
+        const statusText = document.getElementById('mouseStatusText');
+        if (statusText) {
+            statusText.style.display = 'block';
+            statusText.textContent = '松手点击';
+        }
     }
 }
 
 function hideMouseCursor() {
     if (mouseCursor) {
         mouseCursor.style.display = 'none';
-        mouseCursor.classList.remove('ready-to-click');
+        mouseCursor.style.borderStyle = 'solid';
+        
+        const statusText = document.getElementById('mouseStatusText');
+        if (statusText) {
+            statusText.style.display = 'none';
+        }
     }
 }
 
-function updateMouseTimer(duration) {
-    const timerDisplay = document.getElementById('mouseTimer');
-    if (timerDisplay) {
-        if (duration < 100) {
-            timerDisplay.style.display = 'none';
-            return;
-        }
-        
-        timerDisplay.style.display = 'block';
-        const seconds = (2 - duration / 1000).toFixed(1);
-        
-        if (seconds > 0) {
-            timerDisplay.textContent = `${seconds}s`;
-            // 改变光标颜色表示进度
-            const progress = duration / 2000;
-            mouseCursor.style.borderColor = `rgb(${102 + 153 * progress}, ${126 - 126 * progress}, ${234 - 134 * progress})`;
-            mouseCursor.style.borderWidth = `${3 + 2 * progress}px`;
+// 执行点击
+function performClick() {
+    const targetElement = hoveredElement || findNearbyClickableElement(mousePosition.x, mousePosition.y);
+    
+    if (targetElement) {
+        // 检查是否是滑块
+        if (targetElement.tagName === 'INPUT' && targetElement.type === 'range') {
+            // 开始拖拽滑块
+            startDrag(targetElement);
         } else {
-            timerDisplay.textContent = '准备点击!';
-            mouseCursor.style.borderColor = '#ff6b6b';
+            // 普通点击
+            targetElement.click();
+            
+            // 视觉反馈
+            clickFeedback(targetElement);
+        }
+    }
+    
+    // 点击动画
+    if (mouseCursor) {
+        const clickAnimation = document.getElementById('clickAnimation');
+        if (clickAnimation) {
+            clickAnimation.style.animation = 'clickPulse 0.3s ease-out';
+            setTimeout(() => {
+                clickAnimation.style.animation = '';
+            }, 300);
         }
     }
 }
 
-function hideMouseTimer() {
-    const timerDisplay = document.getElementById('mouseTimer');
-    if (timerDisplay) {
-        timerDisplay.style.display = 'none';
-    }
-    if (mouseCursor) {
-        mouseCursor.style.borderColor = '#667eea';
-        mouseCursor.style.borderWidth = '3px';
+// 点击反馈
+function clickFeedback(element) {
+    const originalBackground = element.style.background;
+    const originalTransform = element.style.transform;
+    
+    element.style.background = 'rgba(76, 175, 80, 0.3)';
+    element.style.transform = 'scale(0.95)';
+    
+    setTimeout(() => {
+        element.style.background = originalBackground;
+        element.style.transform = originalTransform;
+    }, 200);
+    
+    // 震动反馈
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
     }
 }
 
-function triggerClick(x, y) {
-    // 播放点击动画
-    const clickAnimation = document.getElementById('clickAnimation');
-    if (clickAnimation) {
-        clickAnimation.style.animation = 'clickPulse 0.5s ease-out';
-        setTimeout(() => {
-            clickAnimation.style.animation = '';
-        }, 500);
+// 开始拖拽
+function startDrag(element) {
+    isDragging = true;
+    dragTarget = element;
+    dragStartValue = parseFloat(element.value);
+    
+    // 高亮拖拽目标
+    element.style.boxShadow = '0 0 20px rgba(255, 152, 0, 0.8)';
+}
+
+// 处理拖拽
+function handleDrag(x, y) {
+    if (!dragTarget || dragTarget.tagName !== 'INPUT') return;
+    
+    const rect = dragTarget.getBoundingClientRect();
+    const percentage = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+    const min = parseFloat(dragTarget.min) || 0;
+    const max = parseFloat(dragTarget.max) || 100;
+    const value = min + (max - min) * percentage;
+    
+    dragTarget.value = Math.round(value);
+    
+    // 触发input事件
+    const event = new Event('input', { bubbles: true });
+    dragTarget.dispatchEvent(event);
+}
+
+// 结束拖拽
+function endDrag() {
+    if (dragTarget) {
+        dragTarget.style.boxShadow = '';
     }
-    
-    // 查找点击位置的元素
-    const elements = document.elementsFromPoint(x, y);
-    
-    // 过滤掉我们自己的画布和鼠标光标
-    const clickableElement = elements.find(el => 
-        el.id !== 'drawingCanvas' && 
-        el.id !== 'handCanvas' && 
-        el.id !== 'virtualMouse' &&
-        el.id !== 'video' &&
-        (el.tagName === 'BUTTON' || 
-         el.classList.contains('color-option') || 
-         el.classList.contains('template-btn') ||
-         el.tagName === 'INPUT')
-    );
-    
-    if (clickableElement) {
-        // 触发点击事件
-        clickableElement.click();
-        
-        // 视觉反馈
-        const originalBackground = clickableElement.style.background;
-        clickableElement.style.background = 'rgba(102, 126, 234, 0.3)';
-        setTimeout(() => {
-            clickableElement.style.background = originalBackground;
-        }, 300);
-    }
+    isDragging = false;
+    dragTarget = null;
 }
 
 // 添加CSS动画
@@ -835,22 +941,6 @@ style.textContent = `
         100% {
             transform: scale(2);
             opacity: 0;
-        }
-    }
-    
-    #virtualMouse.ready-to-click {
-        animation: pulse 0.5s ease-in-out infinite;
-    }
-    
-    @keyframes pulse {
-        0% {
-            transform: translate(-50%, -50%) scale(1);
-        }
-        50% {
-            transform: translate(-50%, -50%) scale(1.1);
-        }
-        100% {
-            transform: translate(-50%, -50%) scale(1);
         }
     }
 `;
@@ -900,7 +990,7 @@ function findNearbyClickableElement(x, y) {
 function highlightElement(element) {
     if (!element) return;
     
-    element.style.transition = 'all 0.3s ease';
+    element.style.transition = 'all 0.2s ease';
     element.style.transform = 'scale(1.1)';
     element.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.6)';
     element.style.zIndex = '1001';
