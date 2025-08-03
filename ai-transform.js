@@ -34,6 +34,21 @@ async function checkProxyAvailable() {
 const OPENROUTER_API_KEY = API_CONFIG.openRouterKey;
 const REPLICATE_API_KEY = API_CONFIG.replicateKey;
 
+// 支持的宽高比
+const SUPPORTED_ASPECT_RATIOS = [
+    { ratio: "1:1", value: 1 },
+    { ratio: "16:9", value: 16/9 },
+    { ratio: "21:9", value: 21/9 },
+    { ratio: "3:2", value: 3/2 },
+    { ratio: "2:3", value: 2/3 },
+    { ratio: "4:5", value: 4/5 },
+    { ratio: "5:4", value: 5/4 },
+    { ratio: "3:4", value: 3/4 },
+    { ratio: "4:3", value: 4/3 },
+    { ratio: "9:16", value: 9/16 },
+    { ratio: "9:21", value: 9/21 }
+];
+
 // Available art styles
 const ART_STYLES = {
     watercolor: {
@@ -67,6 +82,92 @@ const ART_STYLES = {
         description: '真实照片风格'
     }
 };
+
+// 获取最接近的支持宽高比
+function getClosestAspectRatio(width, height) {
+    const currentRatio = width / height;
+    let closestRatio = SUPPORTED_ASPECT_RATIOS[0];
+    let minDiff = Math.abs(currentRatio - closestRatio.value);
+    
+    for (const ratio of SUPPORTED_ASPECT_RATIOS) {
+        const diff = Math.abs(currentRatio - ratio.value);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestRatio = ratio;
+        }
+    }
+    
+    return closestRatio;
+}
+
+// 调整画布到支持的宽高比（白底）
+function adjustCanvasToSupportedRatio(sourceCanvas) {
+    const sourceWidth = sourceCanvas.width;
+    const sourceHeight = sourceCanvas.height;
+    
+    // 获取最接近的支持宽高比
+    const targetRatio = getClosestAspectRatio(sourceWidth, sourceHeight);
+    console.log(`Adjusting aspect ratio from ${sourceWidth}x${sourceHeight} to ${targetRatio.ratio}`);
+    
+    // 计算新的尺寸
+    let newWidth, newHeight;
+    const currentRatio = sourceWidth / sourceHeight;
+    
+    if (currentRatio > targetRatio.value) {
+        // 图片太宽，需要裁剪左右
+        newHeight = sourceHeight;
+        newWidth = Math.round(sourceHeight * targetRatio.value);
+    } else if (currentRatio < targetRatio.value) {
+        // 图片太高，需要裁剪上下
+        newWidth = sourceWidth;
+        newHeight = Math.round(sourceWidth / targetRatio.value);
+    } else {
+        // 比例正好，不需要调整
+        newWidth = sourceWidth;
+        newHeight = sourceHeight;
+    }
+    
+    // 创建新的画布
+    const adjustedCanvas = document.createElement('canvas');
+    adjustedCanvas.width = newWidth;
+    adjustedCanvas.height = newHeight;
+    const ctx = adjustedCanvas.getContext('2d');
+    
+    // 填充白色背景
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, newWidth, newHeight);
+    
+    // 计算裁剪或居中位置
+    let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
+    let dx = 0, dy = 0;
+    
+    if (currentRatio > targetRatio.value) {
+        // 裁剪左右
+        const cropWidth = sourceHeight * targetRatio.value;
+        sx = (sourceWidth - cropWidth) / 2;
+        sw = cropWidth;
+    } else if (currentRatio < targetRatio.value) {
+        // 裁剪上下
+        const cropHeight = sourceWidth / targetRatio.value;
+        sy = (sourceHeight - cropHeight) / 2;
+        sh = cropHeight;
+    }
+    
+    // 绘制调整后的图像
+    ctx.drawImage(sourceCanvas, sx, sy, sw, sh, dx, dy, newWidth, newHeight);
+    
+    return {
+        canvas: adjustedCanvas,
+        aspectRatio: targetRatio.ratio
+    };
+}
+
+// 创建白底涂鸦画布
+function createWhiteBackgroundCanvas(sourceCanvas) {
+    const result = adjustCanvasToSupportedRatio(sourceCanvas);
+    console.log(`Created white background canvas with aspect ratio: ${result.aspectRatio}`);
+    return result.canvas;
+}
 
 // Convert canvas to base64 image
 async function canvasToBase64(canvas) {
@@ -259,7 +360,7 @@ Generate a prompt that will create an artistic version while keeping all origina
 }
 
 // Step 3: Generate art with Flux
-async function generateArtWithFlux(imageUrl, prompt, promptStrength = 0.8) {
+async function generateArtWithFlux(imageUrl, prompt, promptStrength = 0.8, aspectRatio = null) {
     // 如果使用代理服务器
     if (API_CONFIG.useProxy) {
         try {
@@ -273,7 +374,8 @@ async function generateArtWithFlux(imageUrl, prompt, promptStrength = 0.8) {
                 body: JSON.stringify({
                     imageUrl,
                     prompt,
-                    promptStrength
+                    promptStrength,
+                    aspectRatio
                 })
             });
             
@@ -359,8 +461,15 @@ async function transformDoodleToArt(canvas, artStyle, userDescription = '', onPr
     try {
         onProgress('正在准备图片...');
         
-        // Convert canvas to data URL
-        const imageDataUrl = await uploadImageToStorage(canvas);
+        // 创建白底调整比例的画布
+        const adjustedResult = adjustCanvasToSupportedRatio(canvas);
+        const adjustedCanvas = adjustedResult.canvas;
+        const aspectRatio = adjustedResult.aspectRatio;
+        
+        console.log(`Using aspect ratio: ${aspectRatio}`);
+        
+        // Convert adjusted canvas to data URL
+        const imageDataUrl = await uploadImageToStorage(adjustedCanvas);
         
         onProgress('正在分析涂鸦内容...');
         
@@ -381,8 +490,8 @@ async function transformDoodleToArt(canvas, artStyle, userDescription = '', onPr
         // For now, we'll use a data URL converter service or temporary storage
         const publicImageUrl = await uploadToPublicStorage(imageDataUrl);
         
-        // Step 3: Generate art with Flux
-        const artworkUrl = await generateArtWithFlux(publicImageUrl, fluxPrompt);
+        // Step 3: Generate art with Flux (传递宽高比)
+        const artworkUrl = await generateArtWithFlux(publicImageUrl, fluxPrompt, 0.8, aspectRatio);
         
         onProgress('完成！');
         

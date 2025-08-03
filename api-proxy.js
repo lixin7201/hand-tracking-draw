@@ -181,7 +181,20 @@ Generate a prompt that will create an artistic version while keeping all origina
 // Generate art with Flux
 app.post('/api/generate-art', async (req, res) => {
     try {
-        const { imageUrl, prompt, promptStrength = 0.8 } = req.body;
+        const { imageUrl, prompt, promptStrength = 0.8, aspectRatio } = req.body;
+        
+        // 构建输入参数
+        const inputParams = {
+            prompt: prompt,
+            image: imageUrl,
+            prompt_strength: promptStrength,
+            num_outputs: 1
+        };
+        
+        // 如果提供了宽高比，添加到参数中
+        if (aspectRatio) {
+            inputParams.aspect_ratio = aspectRatio;
+        }
         
         const response = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-krea-dev/predictions', {
             method: 'POST',
@@ -191,12 +204,7 @@ app.post('/api/generate-art', async (req, res) => {
                 'Prefer': 'wait'
             },
             body: JSON.stringify({
-                input: {
-                    prompt: prompt,
-                    image: imageUrl,
-                    prompt_strength: promptStrength,
-                    num_outputs: 1
-                }
+                input: inputParams
             })
         });
 
