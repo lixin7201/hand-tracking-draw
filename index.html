@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手势画图应用</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+
+        #videoContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #drawingCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        #handCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            display: flex;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 80px;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            border: 3px solid transparent;
+        }
+
+        .color-option:hover {
+            transform: scale(1.2);
+        }
+
+        .color-option.active {
+            border-color: #333;
+            transform: scale(1.2);
+        }
+
+        .brush-size {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brush-size input {
+            width: 100px;
+        }
+
+        .status {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            backdrop-filter: blur(10px);
+        }
+
+        .gesture-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            max-width: 200px;
+        }
+
+        .gesture-indicator h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .gesture-indicator p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                bottom: 10px;
+                padding: 10px;
+                gap: 10px;
+                flex-wrap: wrap;
+                width: 90%;
+            }
+
+            .control-btn {
+                padding: 8px 15px;
+                font-size: 12px;
+                min-width: 60px;
+            }
+
+            .color-option {
+                width: 25px;
+                height: 25px;
+            }
+
+            .gesture-indicator {
+                right: 10px;
+                top: 10px;
+                padding: 10px;
+                font-size: 12px;
+            }
+
+            .status {
+                top: 10px;
+                font-size: 12px;
+                padding: 8px 15px;
+            }
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">正在加载摄像头...</div>
+    
+    <div id="videoContainer">
+        <video id="video" autoplay playsinline></video>
+    </div>
+    
+    <canvas id="drawingCanvas"></canvas>
+    <canvas id="handCanvas"></canvas>
+    
+    <div id="status" class="status" style="display: none;">
+        手势检测已启动
+    </div>
+    
+    <div class="gesture-indicator">
+        <h3>手势说明</h3>
+        <p>✊ 握拳: 停止绘制</p>
+        <p>☝️ 食指: 开始绘制</p>
+        <p>✌️ 两指: 橡皮擦</p>
+        <p>🖐️ 五指: 清空画布</p>
+    </div>
+    
+    <div class="controls">
+        <div class="color-picker">
+            <div class="color-option active" style="background: #FF0000;" data-color="#FF0000"></div>
+            <div class="color-option" style="background: #00FF00;" data-color="#00FF00"></div>
+            <div class="color-option" style="background: #0000FF;" data-color="#0000FF"></div>
+            <div class="color-option" style="background: #FFFF00;" data-color="#FFFF00"></div>
+            <div class="color-option" style="background: #FF00FF;" data-color="#FF00FF"></div>
+            <div class="color-option" style="background: #00FFFF;" data-color="#00FFFF"></div>
+            <div class="color-option" style="background: #000000;" data-color="#000000"></div>
+            <div class="color-option" style="background: #FFFFFF;" data-color="#FFFFFF"></div>
+        </div>
+        <div class="brush-size">
+            <label>画笔大小:</label>
+            <input type="range" id="brushSize" min="1" max="20" value="5">
+            <span id="brushSizeValue">5</span>
+        </div>
+        <button class="control-btn" id="clearBtn">清空</button>
+        <button class="control-btn" id="saveBtn">保存</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

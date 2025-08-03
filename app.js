@@ -1,0 +1,373 @@
+// 全局变量
+let video, drawingCanvas, handCanvas, drawingCtx, handCtx;
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+let currentColor = '#FF0000';
+let brushSize = 5;
+let isErasing = false;
+let hands;
+let camera;
+
+// 初始化
+window.addEventListener('DOMContentLoaded', async () => {
+    await initializeApp();
+});
+
+async function initializeApp() {
+    // 获取DOM元素
+    video = document.getElementById('video');
+    drawingCanvas = document.getElementById('drawingCanvas');
+    handCanvas = document.getElementById('handCanvas');
+    drawingCtx = drawingCanvas.getContext('2d');
+    handCtx = handCanvas.getContext('2d');
+    
+    // 设置画布大小
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // 初始化控件
+    initializeControls();
+    
+    // 初始化MediaPipe Hands
+    await initializeHandTracking();
+    
+    // 启动摄像头
+    await startCamera();
+}
+
+function resizeCanvas() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    drawingCanvas.width = width;
+    drawingCanvas.height = height;
+    handCanvas.width = width;
+    handCanvas.height = height;
+}
+
+function initializeControls() {
+    // 颜色选择器
+    const colorOptions = document.querySelectorAll('.color-option');
+    colorOptions.forEach(option => {
+        option.addEventListener('click', (e) => {
+            colorOptions.forEach(opt => opt.classList.remove('active'));
+            e.target.classList.add('active');
+            currentColor = e.target.dataset.color;
+            isErasing = false;
+        });
+    });
+    
+    // 画笔大小
+    const brushSizeInput = document.getElementById('brushSize');
+    const brushSizeValue = document.getElementById('brushSizeValue');
+    brushSizeInput.addEventListener('input', (e) => {
+        brushSize = parseInt(e.target.value);
+        brushSizeValue.textContent = brushSize;
+    });
+    
+    // 清空按钮
+    document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+    
+    // 保存按钮
+    document.getElementById('saveBtn').addEventListener('click', saveDrawing);
+}
+
+async function initializeHandTracking() {
+    hands = new Hands({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+        }
+    });
+    
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.5
+    });
+    
+    hands.onResults(onHandResults);
+}
+
+async function startCamera() {
+    const loading = document.getElementById('loading');
+    const status = document.getElementById('status');
+    
+    try {
+        // 请求摄像头权限
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user'
+            }
+        });
+        
+        video.srcObject = stream;
+        
+        camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({ image: video });
+            },
+            width: 1280,
+            height: 720
+        });
+        
+        camera.start();
+        
+        loading.style.display = 'none';
+        status.style.display = 'block';
+        
+        setTimeout(() => {
+            status.style.display = 'none';
+        }, 3000);
+        
+    } catch (error) {
+        console.error('摄像头访问失败:', error);
+        loading.textContent = '摄像头访问失败，请检查权限设置';
+    }
+}
+
+function onHandResults(results) {
+    // 清空手部画布
+    handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+    
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        
+        // 绘制手部关键点
+        drawHandLandmarks(landmarks);
+        
+        // 检测手势并执行相应操作
+        detectGestureAndDraw(landmarks);
+    } else {
+        // 没有检测到手时停止绘制
+        isDrawing = false;
+    }
+}
+
+function drawHandLandmarks(landmarks) {
+    handCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+    handCtx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+    handCtx.lineWidth = 2;
+    
+    // 绘制关键点
+    landmarks.forEach(landmark => {
+        const x = landmark.x * handCanvas.width;
+        const y = landmark.y * handCanvas.height;
+        
+        handCtx.beginPath();
+        handCtx.arc(x, y, 5, 0, 2 * Math.PI);
+        handCtx.fill();
+    });
+    
+    // 绘制连接线
+    const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],  // 拇指
+        [0, 5], [5, 6], [6, 7], [7, 8],  // 食指
+        [5, 9], [9, 10], [10, 11], [11, 12],  // 中指
+        [9, 13], [13, 14], [14, 15], [15, 16],  // 无名指
+        [13, 17], [17, 18], [18, 19], [19, 20],  // 小指
+        [0, 17]  // 手掌
+    ];
+    
+    connections.forEach(([start, end]) => {
+        const startPoint = landmarks[start];
+        const endPoint = landmarks[end];
+        
+        handCtx.beginPath();
+        handCtx.moveTo(startPoint.x * handCanvas.width, startPoint.y * handCanvas.height);
+        handCtx.lineTo(endPoint.x * handCanvas.width, endPoint.y * handCanvas.height);
+        handCtx.stroke();
+    });
+}
+
+function detectGestureAndDraw(landmarks) {
+    // 获取关键点位置
+    const indexTip = landmarks[8];  // 食指尖
+    const indexMcp = landmarks[5];  // 食指根部
+    const middleTip = landmarks[12];  // 中指尖
+    const middleMcp = landmarks[9];  // 中指根部
+    const ringTip = landmarks[16];  // 无名指尖
+    const ringMcp = landmarks[13];  // 无名指根部
+    const pinkyTip = landmarks[20];  // 小指尖
+    const pinkyMcp = landmarks[17];  // 小指根部
+    const thumbTip = landmarks[4];  // 拇指尖
+    const thumbMcp = landmarks[2];  // 拇指根部
+    
+    // 计算手指是否伸直
+    const isIndexUp = indexTip.y < indexMcp.y - 0.05;
+    const isMiddleUp = middleTip.y < middleMcp.y - 0.05;
+    const isRingUp = ringTip.y < ringMcp.y - 0.05;
+    const isPinkyUp = pinkyTip.y < pinkyMcp.y - 0.05;
+    const isThumbUp = Math.abs(thumbTip.x - thumbMcp.x) > 0.05;
+    
+    // 计算伸直的手指数量
+    const fingersUp = [isIndexUp, isMiddleUp, isRingUp, isPinkyUp, isThumbUp].filter(x => x).length;
+    
+    // 获取食指尖位置（用于绘制）
+    const x = indexTip.x * drawingCanvas.width;
+    const y = indexTip.y * drawingCanvas.height;
+    
+    // 根据手势执行不同操作
+    if (fingersUp === 5) {
+        // 五指张开 - 清空画布
+        clearCanvas();
+        isDrawing = false;
+    } else if (fingersUp === 2 && isIndexUp && isMiddleUp) {
+        // 两指（食指和中指） - 橡皮擦模式
+        if (!isErasing) {
+            isErasing = true;
+            isDrawing = false;
+        }
+        eraseAt(x, y);
+    } else if (fingersUp === 1 && isIndexUp) {
+        // 只有食指 - 绘制模式
+        isErasing = false;
+        draw(x, y);
+    } else {
+        // 其他手势 - 停止绘制
+        isDrawing = false;
+        isErasing = false;
+    }
+}
+
+function draw(x, y) {
+    if (!isDrawing) {
+        isDrawing = true;
+        lastX = x;
+        lastY = y;
+        return;
+    }
+    
+    drawingCtx.strokeStyle = currentColor;
+    drawingCtx.lineWidth = brushSize;
+    drawingCtx.lineCap = 'round';
+    drawingCtx.lineJoin = 'round';
+    
+    drawingCtx.beginPath();
+    drawingCtx.moveTo(lastX, lastY);
+    drawingCtx.lineTo(x, y);
+    drawingCtx.stroke();
+    
+    lastX = x;
+    lastY = y;
+}
+
+function eraseAt(x, y) {
+    drawingCtx.save();
+    drawingCtx.globalCompositeOperation = 'destination-out';
+    drawingCtx.beginPath();
+    drawingCtx.arc(x, y, brushSize * 2, 0, 2 * Math.PI);
+    drawingCtx.fill();
+    drawingCtx.restore();
+}
+
+function clearCanvas() {
+    drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+}
+
+function saveDrawing() {
+    // 创建临时画布合并视频和绘图
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = drawingCanvas.width;
+    tempCanvas.height = drawingCanvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // 绘制视频帧
+    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // 绘制用户的画
+    tempCtx.drawImage(drawingCanvas, 0, 0);
+    
+    // 下载图片
+    const link = document.createElement('a');
+    link.download = `drawing_${new Date().getTime()}.png`;
+    link.href = tempCanvas.toDataURL();
+    link.click();
+}
+
+// 添加触摸事件支持（用于移动设备）
+let touchDrawing = false;
+let touchLastX = 0;
+let touchLastY = 0;
+
+drawingCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = drawingCanvas.getBoundingClientRect();
+    touchLastX = touch.clientX - rect.left;
+    touchLastY = touch.clientY - rect.top;
+    touchDrawing = true;
+}, { passive: false });
+
+drawingCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!touchDrawing) return;
+    
+    const touch = e.touches[0];
+    const rect = drawingCanvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    drawingCtx.strokeStyle = currentColor;
+    drawingCtx.lineWidth = brushSize;
+    drawingCtx.lineCap = 'round';
+    drawingCtx.lineJoin = 'round';
+    
+    drawingCtx.beginPath();
+    drawingCtx.moveTo(touchLastX, touchLastY);
+    drawingCtx.lineTo(x, y);
+    drawingCtx.stroke();
+    
+    touchLastX = x;
+    touchLastY = y;
+}, { passive: false });
+
+drawingCanvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    touchDrawing = false;
+}, { passive: false });
+
+// 添加鼠标事件支持（用于没有摄像头的情况）
+let mouseDrawing = false;
+
+drawingCanvas.addEventListener('mousedown', (e) => {
+    const rect = drawingCanvas.getBoundingClientRect();
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
+    mouseDrawing = true;
+    drawingCanvas.style.pointerEvents = 'auto';
+});
+
+drawingCanvas.addEventListener('mousemove', (e) => {
+    if (!mouseDrawing) return;
+    
+    const rect = drawingCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    drawingCtx.strokeStyle = currentColor;
+    drawingCtx.lineWidth = brushSize;
+    drawingCtx.lineCap = 'round';
+    drawingCtx.lineJoin = 'round';
+    
+    drawingCtx.beginPath();
+    drawingCtx.moveTo(lastX, lastY);
+    drawingCtx.lineTo(x, y);
+    drawingCtx.stroke();
+    
+    lastX = x;
+    lastY = y;
+});
+
+drawingCanvas.addEventListener('mouseup', () => {
+    mouseDrawing = false;
+    drawingCanvas.style.pointerEvents = 'none';
+});
+
+drawingCanvas.addEventListener('mouseleave', () => {
+    mouseDrawing = false;
+    drawingCanvas.style.pointerEvents = 'none';
+});

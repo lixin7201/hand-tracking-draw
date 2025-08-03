@@ -1,0 +1,18 @@
+{
+  "name": "gesture-drawing-app",
+  "version": "1.0.0",
+  "description": "手势画图应用 - 使用摄像头和手部追踪进行绘画",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  },
+  "keywords": [
+    "gesture",
+    "drawing",
+    "mediapipe",
+    "hand-tracking"
+  ],
+  "author": "",
+  "license": "MIT"
+}
