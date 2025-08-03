@@ -14,6 +14,7 @@ let templateCanvas, templateCtx;
 let coloringCanvas, coloringCtx;
 let hasStartedDrawing = false; // 跟踪是否开始画画
 let selectedStyle = null; // AI转画选中的样式
+let brushSystem = null; // 画笔系统
 
 // 鼠标模式相关变量
 let mouseCursor = null;
@@ -67,9 +68,13 @@ async function initializeApp() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
+    // 初始化画笔系统
+    brushSystem = new BrushSystem(drawingCtx);
+    
     // 初始化控件
     initializeControls();
     initializeTemplates();
+    initializeBrushSelector();
     initializeMouseCursor();
     
     // 初始化触摸和鼠标事件
@@ -613,6 +618,9 @@ function detectGestureAndDraw(landmarks) {
         draw(x, y);
     } else {
         // 其他手势 - 停止绘制
+        if (isDrawing) {
+            brushSystem.endStroke();
+        }
         isDrawing = false;
         isErasing = false;
     }
@@ -634,23 +642,17 @@ function draw(x, y) {
         drawingCtx.fill();
         drawingCtx.globalCompositeOperation = 'source-over';
     } else {
-        // 自由绘画模式
+        // 自由绘画模式 - 使用画笔系统
         if (!isDrawing) {
             isDrawing = true;
             lastX = x;
             lastY = y;
+            brushSystem.startStroke(x, y, currentColor, brushSize);
             return;
         }
         
-        drawingCtx.strokeStyle = currentColor;
-        drawingCtx.lineWidth = brushSize;
-        drawingCtx.lineCap = 'round';
-        drawingCtx.lineJoin = 'round';
-        
-        drawingCtx.beginPath();
-        drawingCtx.moveTo(lastX, lastY);
-        drawingCtx.lineTo(x, y);
-        drawingCtx.stroke();
+        // 使用画笔系统绘制
+        brushSystem.drawStroke(lastX, lastY, x, y, currentColor, brushSize);
         
         lastX = x;
         lastY = y;
@@ -658,12 +660,20 @@ function draw(x, y) {
 }
 
 function eraseAt(x, y) {
-    drawingCtx.save();
-    drawingCtx.globalCompositeOperation = 'destination-out';
-    drawingCtx.beginPath();
-    drawingCtx.arc(x, y, brushSize * 2, 0, 2 * Math.PI);
-    drawingCtx.fill();
-    drawingCtx.restore();
+    // 使用画笔系统的橡皮擦
+    const previousBrush = brushSystem.currentBrush;
+    brushSystem.setBrush('eraser');
+    
+    if (!isDrawing) {
+        isDrawing = true;
+        lastX = x;
+        lastY = y;
+        brushSystem.startStroke(x, y, currentColor, brushSize);
+    } else {
+        brushSystem.drawStroke(lastX, lastY, x, y, currentColor, brushSize);
+        lastX = x;
+        lastY = y;
+    }
 }
 
 function clearCanvas() {
@@ -1636,3 +1646,170 @@ function saveTransformResult() {
 // 将函数暴露到全局作用域
 window.closeTransformModal = closeTransformModal;
 window.closeResultModal = closeResultModal;
+
+// 初始化画笔选择器
+function initializeBrushSelector() {
+    const brushList = document.getElementById('brushList');
+    if (!brushList || !brushSystem) return;
+    
+    // 清空列表
+    brushList.innerHTML = '';
+    
+    // 画笔描述
+    const brushDescriptions = {
+        marker: '鲜艳流畅',
+        coloredPencil: '细节丰富',
+        watercolor: '渐变晕染',
+        pencil: '素描质感',
+        spray: '喷溅效果',
+        roller: '大面积涂抹',
+        crayon: '儿童友好',
+        pastel: '柔和粉色',
+        eraser: '擦除内容'
+    };
+    
+    // 创建画笔选项
+    Object.keys(brushSystem.brushes).forEach((brushKey, index) => {
+        const brush = brushSystem.brushes[brushKey];
+        const brushItem = document.createElement('div');
+        brushItem.className = 'brush-item';
+        if (index === 0) brushItem.classList.add('active');
+        
+        brushItem.innerHTML = `
+            <span class="brush-item-icon">${brush.icon}</span>
+            <div class="brush-item-info">
+                <div class="brush-item-name">${brush.name}</div>
+                <div class="brush-item-desc">${brushDescriptions[brushKey] || ''}</div>
+            </div>
+        `;
+        
+        brushItem.onclick = () => selectBrush(brushKey, brushItem);
+        brushList.appendChild(brushItem);
+    });
+    
+    // 初始化画笔参数控件
+    initializeBrushParams();
+    
+    // 初始化画笔预览
+    initializeBrushPreview();
+}
+
+function selectBrush(brushKey, element) {
+    if (!brushSystem) return;
+    
+    // 设置当前画笔
+    brushSystem.setBrush(brushKey);
+    
+    // 更新UI状态
+    document.querySelectorAll('.brush-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    element.classList.add('active');
+    
+    // 更新参数控件可见性
+    updateBrushParamsVisibility(brushKey);
+    
+    // 更新预览
+    updateBrushPreview();
+    
+    // 如果选择了橡皮擦，设置相应状态
+    isErasing = (brushKey === 'eraser');
+}
+
+function initializeBrushParams() {
+    // 透明度控制
+    const opacitySlider = document.getElementById('brushOpacity');
+    const opacityValue = document.getElementById('opacityValue');
+    if (opacitySlider && opacityValue) {
+        opacitySlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            opacityValue.textContent = value + '%';
+            updateBrushPreview();
+        });
+    }
+    
+    // 纹理控制
+    const textureSlider = document.getElementById('brushTexture');
+    const textureValue = document.getElementById('textureValue');
+    if (textureSlider && textureValue) {
+        textureSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            textureValue.textContent = value + '%';
+            updateBrushPreview();
+        });
+    }
+    
+    // 散布控制
+    const scatterSlider = document.getElementById('brushScatter');
+    const scatterValue = document.getElementById('scatterValue');
+    if (scatterSlider && scatterValue) {
+        scatterSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            scatterValue.textContent = value;
+            updateBrushPreview();
+        });
+    }
+}
+
+function updateBrushParamsVisibility(brushKey) {
+    const textureParam = document.getElementById('textureParam');
+    const scatterParam = document.getElementById('scatterParam');
+    
+    // 根据画笔类型显示不同参数
+    if (textureParam) {
+        textureParam.style.display = 
+            ['coloredPencil', 'pencil', 'crayon', 'pastel'].includes(brushKey) ? 'block' : 'none';
+    }
+    
+    if (scatterParam) {
+        scatterParam.style.display = brushKey === 'spray' ? 'block' : 'none';
+    }
+}
+
+function initializeBrushPreview() {
+    const canvas = document.getElementById('brushPreview');
+    if (!canvas) return;
+    
+    updateBrushPreview();
+}
+
+function updateBrushPreview() {
+    const canvas = document.getElementById('brushPreview');
+    if (!canvas || !brushSystem) return;
+    
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    // 清空画布
+    ctx.clearRect(0, 0, width, height);
+    
+    // 创建临时画笔系统用于预览
+    const previewBrush = new BrushSystem(ctx);
+    previewBrush.setBrush(brushSystem.currentBrush);
+    
+    // 绘制预览线条
+    const startX = 20;
+    const startY = height / 2;
+    const endX = width - 20;
+    const endY = height / 2;
+    
+    // 绘制波浪线以展示效果
+    const steps = 30;
+    let prevX = startX;
+    let prevY = startY;
+    
+    previewBrush.startStroke(prevX, prevY, currentColor, brushSize);
+    
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const x = startX + (endX - startX) * t;
+        const y = startY + Math.sin(t * Math.PI * 2) * 10;
+        
+        previewBrush.drawStroke(prevX, prevY, x, y, currentColor, brushSize);
+        prevX = x;
+        prevY = y;
+    }
+    
+    previewBrush.endStroke();
+}

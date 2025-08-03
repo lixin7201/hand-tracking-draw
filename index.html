@@ -998,6 +998,182 @@
                 font-size: 16px;
             }
         }
+
+        /* 画笔选择器样式 */
+        .brush-selector {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            max-width: 180px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .brush-selector h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .brush-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .brush-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .brush-item:hover {
+            transform: translateX(-5px);
+            border-color: #667eea;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .brush-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .brush-item-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .brush-item-info {
+            flex: 1;
+        }
+
+        .brush-item-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .brush-item-desc {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 2px;
+        }
+
+        .brush-item.active .brush-item-name,
+        .brush-item.active .brush-item-desc {
+            color: white;
+        }
+
+        /* 画笔参数控制 */
+        .brush-params {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .brush-param {
+            margin-bottom: 12px;
+        }
+
+        .brush-param label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .brush-param input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 5px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .brush-param input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+        }
+
+        .brush-param input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+        }
+
+        .brush-param-value {
+            display: inline-block;
+            font-size: 11px;
+            color: #999;
+            margin-left: 5px;
+        }
+
+        /* 画笔预览 */
+        .brush-preview {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .brush-preview canvas {
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background: white;
+        }
+
+        @media (max-width: 768px) {
+            .brush-selector {
+                position: fixed;
+                bottom: 100px;
+                right: 10px;
+                top: auto;
+                max-width: 150px;
+                max-height: 50vh;
+                padding: 10px;
+            }
+
+            .brush-selector h3 {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+            .brush-item {
+                padding: 8px;
+            }
+
+            .brush-item-icon {
+                font-size: 20px;
+            }
+
+            .brush-item-name {
+                font-size: 12px;
+            }
+
+            .brush-item-desc {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1049,6 +1225,31 @@
         <p>🖐️ 五指: 清空画布</p>
         <p>👌 捏合: 鼠标模式</p>
         <p style="font-size: 10px; color: #999; margin-top: 5px;">连续捏合2次=点击</p>
+    </div>
+    
+    <!-- 画笔选择器 -->
+    <div class="brush-selector">
+        <h3>选择画笔</h3>
+        <div class="brush-list" id="brushList">
+            <!-- 画笔选项将在这里动态生成 -->
+        </div>
+        <div class="brush-params">
+            <div class="brush-param">
+                <label>透明度 <span class="brush-param-value" id="opacityValue">90%</span></label>
+                <input type="range" id="brushOpacity" min="10" max="100" value="90">
+            </div>
+            <div class="brush-param" id="textureParam" style="display: none;">
+                <label>纹理强度 <span class="brush-param-value" id="textureValue">50%</span></label>
+                <input type="range" id="brushTexture" min="0" max="100" value="50">
+            </div>
+            <div class="brush-param" id="scatterParam" style="display: none;">
+                <label>散布范围 <span class="brush-param-value" id="scatterValue">2</span></label>
+                <input type="range" id="brushScatter" min="1" max="5" value="2">
+            </div>
+        </div>
+        <div class="brush-preview">
+            <canvas id="brushPreview" width="120" height="40"></canvas>
+        </div>
     </div>
     
     <div class="controls">
@@ -1239,6 +1440,8 @@
     <script src="templates.js"></script>
     <script src="image-upload.js"></script>
     <script src="ai-transform.js"></script>
+    <script src="brush-tools.js"></script>
     <script src="app.js"></script>
+    <script src="event-patch.js"></script>
 </body>
 </html>
