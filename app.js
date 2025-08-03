@@ -617,6 +617,15 @@ function clearCanvas() {
 }
 
 function saveDrawing() {
+    // 显示保存选择弹窗
+    const modal = document.getElementById('saveModal');
+    if (modal) {
+        modal.classList.add('show');
+    }
+}
+
+// 保存带摄像头背景的图片
+function saveWithCamera() {
     // 创建临时画布合并视频和绘图
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = drawingCanvas.width;
@@ -631,10 +640,51 @@ function saveDrawing() {
     
     // 下载图片
     const link = document.createElement('a');
-    link.download = `drawing_${new Date().getTime()}.png`;
+    link.download = `康康画画_原图_${new Date().getTime()}.png`;
     link.href = tempCanvas.toDataURL();
     link.click();
+    
+    // 关闭弹窗
+    closeSaveModal();
 }
+
+// 保存白色背景的图片
+function saveWithWhiteBackground() {
+    // 创建临时画布
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = drawingCanvas.width;
+    tempCanvas.height = drawingCanvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // 填充白色背景
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // 绘制用户的画
+    tempCtx.drawImage(drawingCanvas, 0, 0);
+    
+    // 下载图片
+    const link = document.createElement('a');
+    link.download = `康康画画_白底_${new Date().getTime()}.png`;
+    link.href = tempCanvas.toDataURL();
+    link.click();
+    
+    // 关闭弹窗
+    closeSaveModal();
+}
+
+// 关闭保存弹窗
+function closeSaveModal() {
+    const modal = document.getElementById('saveModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+// 将函数暴露到全局作用域
+window.saveWithCamera = saveWithCamera;
+window.saveWithWhiteBackground = saveWithWhiteBackground;
+window.closeSaveModal = closeSaveModal;
 
 // 添加触摸事件支持（用于移动设备）
 let touchDrawing = false;

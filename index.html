@@ -293,6 +293,145 @@
             }
         }
 
+        /* 保存选择弹窗 */
+        .save-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .save-modal.show {
+            display: flex;
+        }
+
+        .save-modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.3s ease;
+            text-align: center;
+        }
+
+        .save-modal h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-family: '幼圆', 'Comic Sans MS', cursive;
+        }
+
+        .save-options {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .save-option {
+            flex: 1;
+            min-width: 150px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .save-option:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            border-color: #667eea;
+        }
+
+        .save-option-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .save-option-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .save-option-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .save-option.with-camera {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .save-option.with-camera .save-option-title,
+        .save-option.with-camera .save-option-desc {
+            color: white;
+        }
+
+        .save-option.white-bg {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .save-modal-close {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #e0e0e0;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .save-modal-close:hover {
+            background: #d0d0d0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .save-modal-content {
+                padding: 20px;
+            }
+
+            .save-options {
+                flex-direction: column;
+            }
+
+            .save-option {
+                min-width: 100%;
+            }
+        }
+
         .loading {
             position: fixed;
             top: 50%;
@@ -472,6 +611,26 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js"></script>
+    <!-- 保存选择弹窗 -->
+    <div id="saveModal" class="save-modal">
+        <div class="save-modal-content">
+            <h2>🎨 选择保存方式</h2>
+            <div class="save-options">
+                <div class="save-option with-camera" onclick="saveWithCamera()">
+                    <div class="save-option-icon">📷</div>
+                    <div class="save-option-title">原图保存</div>
+                    <div class="save-option-desc">保留摄像头背景</div>
+                </div>
+                <div class="save-option white-bg" onclick="saveWithWhiteBackground()">
+                    <div class="save-option-icon">🖼️</div>
+                    <div class="save-option-title">白底保存</div>
+                    <div class="save-option-desc">纯白色背景</div>
+                </div>
+            </div>
+            <button class="save-modal-close" onclick="closeSaveModal()">取消</button>
+        </div>
+    </div>
+    
     <script src="templates.js"></script>
     <script src="app.js"></script>
 </body>
