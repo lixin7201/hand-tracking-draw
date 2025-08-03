@@ -148,8 +148,8 @@
 
         .gesture-indicator {
             position: fixed;
-            top: 20px;
-            right: 20px;
+            top: 90px;
+            left: 20px;
             z-index: 5;
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
@@ -157,6 +157,7 @@
             font-size: 14px;
             backdrop-filter: blur(10px);
             max-width: 200px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
 
         .gesture-indicator h3 {
@@ -191,10 +192,11 @@
             }
 
             .gesture-indicator {
-                right: 10px;
-                top: 10px;
+                left: 10px;
+                top: 120px;
                 padding: 10px;
                 font-size: 12px;
+                max-width: 150px;
             }
 
             .status {
@@ -206,10 +208,10 @@
 
         .site-title {
             position: fixed;
-            top: 30px;
+            top: 80px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 100;
+            z-index: 4;
             font-size: 48px;
             font-weight: 900;
             font-family: 'Comic Sans MS', '华文彩云', '幼圆', cursive;
@@ -285,7 +287,7 @@
         @media (max-width: 768px) {
             .site-title {
                 font-size: 32px;
-                top: 20px;
+                top: 150px;
             }
             
             .site-title .decoration {
@@ -447,92 +449,116 @@
             backdrop-filter: blur(10px);
         }
 
-        .template-selector {
+        /* 顶部工具栏 */
+        .toolbar {
             position: fixed;
-            top: 70px;
-            left: 20px;
-            z-index: 5;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            display: flex;
+            gap: 15px;
+            align-items: center;
             background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
+            padding: 12px 20px;
             border-radius: 15px;
             backdrop-filter: blur(10px);
-            max-width: 150px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
 
-        .template-selector h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 14px;
-        }
-
-        .template-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin-bottom: 15px;
-        }
-
-        .template-btn {
-            padding: 8px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            background: white;
-            cursor: pointer;
-            font-size: 24px;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-
-        .template-btn:hover {
-            transform: scale(1.1);
-            border-color: #667eea;
-            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-        }
-
-        .template-btn.active {
-            border-color: #667eea;
-            background: linear-gradient(135deg, #667eea30 0%, #764ba230 100%);
-        }
-
-        .mode-toggle {
+        .toolbar-section {
             display: flex;
-            gap: 5px;
-            margin-top: 10px;
+            align-items: center;
+            gap: 10px;
         }
 
-        .mode-btn {
-            flex: 1;
-            padding: 6px;
-            border: 1px solid #ddd;
+        .toolbar-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .toolbar-select {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
             border-radius: 8px;
             background: white;
+            font-size: 13px;
             cursor: pointer;
-            font-size: 11px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .toolbar-select:hover {
+            border-color: #667eea;
+        }
+
+        .toolbar-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .toolbar-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
 
-        .mode-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: transparent;
+        .toolbar-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 30px;
+            background: #e0e0e0;
+            margin: 0 5px;
         }
 
         @media (max-width: 768px) {
-            .template-selector {
-                top: auto;
-                bottom: 80px;
-                left: 10px;
-                max-width: 120px;
-                padding: 10px;
+            .toolbar {
+                top: 10px;
+                padding: 8px 12px;
+                gap: 8px;
+                flex-direction: column;
+                width: 90%;
+                max-width: 90%;
             }
 
-            .template-grid {
-                gap: 5px;
+            .toolbar-section {
+                width: 100%;
+                justify-content: space-between;
             }
 
-            .template-btn {
-                font-size: 20px;
-                padding: 5px;
+            .toolbar-select {
+                min-width: 0;
+                flex: 1;
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .toolbar-button {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .toolbar-label {
+                font-size: 12px;
+                min-width: 40px;
+            }
+
+            .toolbar-divider {
+                width: 100%;
+                height: 1px;
+                margin: 5px 0;
             }
         }
         
@@ -999,87 +1025,18 @@
             }
         }
 
-        /* 画笔选择器样式 */
-        .brush-selector {
+        /* 画笔参数面板 */
+        .brush-params-panel {
             position: fixed;
-            top: 70px;
+            bottom: 100px;
             right: 20px;
             z-index: 5;
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
             border-radius: 15px;
             backdrop-filter: blur(10px);
-            max-width: 180px;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-
-        .brush-selector h3 {
-            margin: 0 0 15px 0;
-            color: #333;
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .brush-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .brush-item {
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: white;
-        }
-
-        .brush-item:hover {
-            transform: translateX(-5px);
-            border-color: #667eea;
-            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.2);
-        }
-
-        .brush-item.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: transparent;
-        }
-
-        .brush-item-icon {
-            font-size: 24px;
-            margin-right: 10px;
-        }
-
-        .brush-item-info {
-            flex: 1;
-        }
-
-        .brush-item-name {
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .brush-item-desc {
-            font-size: 11px;
-            opacity: 0.8;
-            margin-top: 2px;
-        }
-
-        .brush-item.active .brush-item-name,
-        .brush-item.active .brush-item-desc {
-            color: white;
-        }
-
-        /* 画笔参数控制 */
-        .brush-params {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e0e0e0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 180px;
         }
 
         .brush-param {
@@ -1127,58 +1084,69 @@
             margin-left: 5px;
         }
 
-        /* 画笔预览 */
-        .brush-preview {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f8f8f8;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .brush-preview canvas {
-            border: 1px solid #e0e0e0;
-            border-radius: 5px;
-            background: white;
-        }
-
         @media (max-width: 768px) {
-            .brush-selector {
-                position: fixed;
-                bottom: 100px;
+            .brush-params-panel {
+                bottom: 90px;
                 right: 10px;
-                top: auto;
-                max-width: 150px;
-                max-height: 50vh;
+                width: 150px;
                 padding: 10px;
-            }
-
-            .brush-selector h3 {
-                font-size: 14px;
-                margin-bottom: 10px;
-            }
-
-            .brush-item {
-                padding: 8px;
-            }
-
-            .brush-item-icon {
-                font-size: 20px;
-            }
-
-            .brush-item-name {
-                font-size: 12px;
-            }
-
-            .brush-item-desc {
-                display: none;
             }
         }
     </style>
 </head>
 <body>
     <!-- 网站标题 -->
-    <div id="siteTitle" class="site-title">
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <!-- 模板选择 -->
+        <div class="toolbar-section">
+            <label class="toolbar-label">模板:</label>
+            <select id="templateSelect" class="toolbar-select">
+                <option value="">无模板</option>
+                <optgroup label="动物">
+                    <option value="cat">🐱 小猫</option>
+                    <option value="dog">🐶 小狗</option>
+                    <option value="rabbit">🐰 兔子</option>
+                    <option value="bear">🐻 小熊</option>
+                </optgroup>
+                <optgroup label="植物">
+                    <option value="flower">🌸 花朵</option>
+                    <option value="tree">🌳 大树</option>
+                    <option value="sun">☀️ 太阳</option>
+                    <option value="rainbow">🌈 彩虹</option>
+                </optgroup>
+            </select>
+            <button class="toolbar-button" id="loadTemplateBtn">加载</button>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <!-- 画笔选择 -->
+        <div class="toolbar-section">
+            <label class="toolbar-label">画笔:</label>
+            <select id="brushSelect" class="toolbar-select">
+                <option value="marker">🖍️ 马克笔</option>
+                <option value="coloredPencil">✏️ 彩色铅笔</option>
+                <option value="watercolor">🎨 水彩笔</option>
+                <option value="pencil">✎ 铅笔</option>
+                <option value="spray">🎯 喷漆</option>
+                <option value="roller">🔲 滚刷</option>
+                <option value="crayon">🖍️ 蜡笔</option>
+                <option value="pastel">🎨 色粉</option>
+                <option value="eraser">🧹 橡皮擦</option>
+            </select>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <!-- 模式切换 -->
+        <div class="toolbar-section">
+            <button class="toolbar-button" id="freeDrawBtn">自由画</button>
+            <button class="toolbar-button" id="coloringBtn" style="background: #e0e0e0; color: #666;">填色</button>
+        </div>
+    </div>
+
+    <div id="siteTitle" class="site-title" style="top: 80px;">
         <span class="decoration star1">✨</span>
         <span class="char1">康</span>
         <span class="char2">康</span>
@@ -1202,20 +1170,6 @@
         手势检测已启动
     </div>
     
-    <div class="template-selector">
-        <h3>选择模板</h3>
-        <div class="template-grid" id="animalTemplates">
-            <!-- 动物模板将在这里动态生成 -->
-        </div>
-        <div class="template-grid" id="plantTemplates">
-            <!-- 植物模板将在这里动态生成 -->
-        </div>
-        <div class="mode-toggle">
-            <button class="mode-btn active" id="freeDrawBtn">自由画</button>
-            <button class="mode-btn" id="coloringBtn">填色</button>
-        </div>
-        <button class="control-btn" id="loadTemplateBtn" style="width: 100%; margin-top: 10px; font-size: 12px; padding: 8px;">加载模板</button>
-    </div>
     
     <div class="gesture-indicator">
         <h3>手势说明</h3>
@@ -1227,28 +1181,19 @@
         <p style="font-size: 10px; color: #999; margin-top: 5px;">连续捏合2次=点击</p>
     </div>
     
-    <!-- 画笔选择器 -->
-    <div class="brush-selector">
-        <h3>选择画笔</h3>
-        <div class="brush-list" id="brushList">
-            <!-- 画笔选项将在这里动态生成 -->
+    <!-- 画笔参数面板 -->
+    <div class="brush-params-panel">
+        <div class="brush-param">
+            <label>透明度 <span class="brush-param-value" id="opacityValue">90%</span></label>
+            <input type="range" id="brushOpacity" min="10" max="100" value="90">
         </div>
-        <div class="brush-params">
-            <div class="brush-param">
-                <label>透明度 <span class="brush-param-value" id="opacityValue">90%</span></label>
-                <input type="range" id="brushOpacity" min="10" max="100" value="90">
-            </div>
-            <div class="brush-param" id="textureParam" style="display: none;">
-                <label>纹理强度 <span class="brush-param-value" id="textureValue">50%</span></label>
-                <input type="range" id="brushTexture" min="0" max="100" value="50">
-            </div>
-            <div class="brush-param" id="scatterParam" style="display: none;">
-                <label>散布范围 <span class="brush-param-value" id="scatterValue">2</span></label>
-                <input type="range" id="brushScatter" min="1" max="5" value="2">
-            </div>
+        <div class="brush-param" id="textureParam" style="display: none;">
+            <label>纹理强度 <span class="brush-param-value" id="textureValue">50%</span></label>
+            <input type="range" id="brushTexture" min="0" max="100" value="50">
         </div>
-        <div class="brush-preview">
-            <canvas id="brushPreview" width="120" height="40"></canvas>
+        <div class="brush-param" id="scatterParam" style="display: none;">
+            <label>散布范围 <span class="brush-param-value" id="scatterValue">2</span></label>
+            <input type="range" id="brushScatter" min="1" max="5" value="2">
         </div>
     </div>
     

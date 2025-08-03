@@ -108,46 +108,58 @@ function resizeCanvas() {
 }
 
 function initializeTemplates() {
-    const animalGrid = document.getElementById('animalTemplates');
-    const plantGrid = document.getElementById('plantTemplates');
+    const templateSelect = document.getElementById('templateSelect');
     
-    // 添加动物模板按钮
-    drawingTemplates.animals.forEach(template => {
-        const btn = document.createElement('button');
-        btn.className = 'template-btn';
-        btn.innerHTML = template.icon;
-        btn.title = template.name;
-        btn.onclick = () => selectTemplate(template);
-        animalGrid.appendChild(btn);
-    });
-    
-    // 添加植物模板按钮
-    drawingTemplates.plants.forEach(template => {
-        const btn = document.createElement('button');
-        btn.className = 'template-btn';
-        btn.innerHTML = template.icon;
-        btn.title = template.name;
-        btn.onclick = () => selectTemplate(template);
-        plantGrid.appendChild(btn);
-    });
+    // 模板选择事件
+    if (templateSelect) {
+        templateSelect.addEventListener('change', (e) => {
+            const value = e.target.value;
+            if (value) {
+                // 查找对应的模板
+                const allTemplates = [...drawingTemplates.animals, ...drawingTemplates.plants];
+                const template = allTemplates.find(t => t.id === value);
+                if (template) {
+                    selectTemplate(template);
+                }
+            } else {
+                currentTemplate = null;
+            }
+        });
+    }
     
     // 模式切换按钮
-    document.getElementById('freeDrawBtn').onclick = () => setDrawingMode('free');
-    document.getElementById('coloringBtn').onclick = () => setDrawingMode('coloring');
+    const freeBtn = document.getElementById('freeDrawBtn');
+    const colorBtn = document.getElementById('coloringBtn');
+    
+    if (freeBtn) {
+        freeBtn.onclick = () => {
+            setDrawingMode('free');
+            freeBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            freeBtn.style.color = 'white';
+            colorBtn.style.background = '#e0e0e0';
+            colorBtn.style.color = '#666';
+        };
+    }
+    
+    if (colorBtn) {
+        colorBtn.onclick = () => {
+            setDrawingMode('coloring');
+            colorBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            colorBtn.style.color = 'white';
+            freeBtn.style.background = '#e0e0e0';
+            freeBtn.style.color = '#666';
+        };
+    }
     
     // 加载模板按钮
-    document.getElementById('loadTemplateBtn').onclick = loadSelectedTemplate;
+    const loadBtn = document.getElementById('loadTemplateBtn');
+    if (loadBtn) {
+        loadBtn.onclick = loadSelectedTemplate;
+    }
 }
 
 function selectTemplate(template) {
     currentTemplate = template;
-    // 更新按钮样式
-    document.querySelectorAll('.template-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.title === template.name) {
-            btn.classList.add('active');
-        }
-    });
 }
 
 function setDrawingMode(mode) {
@@ -1649,68 +1661,30 @@ window.closeResultModal = closeResultModal;
 
 // 初始化画笔选择器
 function initializeBrushSelector() {
-    const brushList = document.getElementById('brushList');
-    if (!brushList || !brushSystem) return;
+    const brushSelect = document.getElementById('brushSelect');
+    if (!brushSelect || !brushSystem) return;
     
-    // 清空列表
-    brushList.innerHTML = '';
-    
-    // 画笔描述
-    const brushDescriptions = {
-        marker: '鲜艳流畅',
-        coloredPencil: '细节丰富',
-        watercolor: '渐变晕染',
-        pencil: '素描质感',
-        spray: '喷溅效果',
-        roller: '大面积涂抹',
-        crayon: '儿童友好',
-        pastel: '柔和粉色',
-        eraser: '擦除内容'
-    };
-    
-    // 创建画笔选项
-    Object.keys(brushSystem.brushes).forEach((brushKey, index) => {
-        const brush = brushSystem.brushes[brushKey];
-        const brushItem = document.createElement('div');
-        brushItem.className = 'brush-item';
-        if (index === 0) brushItem.classList.add('active');
-        
-        brushItem.innerHTML = `
-            <span class="brush-item-icon">${brush.icon}</span>
-            <div class="brush-item-info">
-                <div class="brush-item-name">${brush.name}</div>
-                <div class="brush-item-desc">${brushDescriptions[brushKey] || ''}</div>
-            </div>
-        `;
-        
-        brushItem.onclick = () => selectBrush(brushKey, brushItem);
-        brushList.appendChild(brushItem);
+    // 画笔选择事件
+    brushSelect.addEventListener('change', (e) => {
+        const brushKey = e.target.value;
+        selectBrush(brushKey);
     });
+    
+    // 默认选中第一个画笔
+    brushSystem.setBrush('marker');
     
     // 初始化画笔参数控件
     initializeBrushParams();
-    
-    // 初始化画笔预览
-    initializeBrushPreview();
 }
 
-function selectBrush(brushKey, element) {
+function selectBrush(brushKey) {
     if (!brushSystem) return;
     
     // 设置当前画笔
     brushSystem.setBrush(brushKey);
     
-    // 更新UI状态
-    document.querySelectorAll('.brush-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    element.classList.add('active');
-    
     // 更新参数控件可见性
     updateBrushParamsVisibility(brushKey);
-    
-    // 更新预览
-    updateBrushPreview();
     
     // 如果选择了橡皮擦，设置相应状态
     isErasing = (brushKey === 'eraser');
@@ -1724,7 +1698,6 @@ function initializeBrushParams() {
         opacitySlider.addEventListener('input', (e) => {
             const value = e.target.value;
             opacityValue.textContent = value + '%';
-            updateBrushPreview();
         });
     }
     
@@ -1735,7 +1708,6 @@ function initializeBrushParams() {
         textureSlider.addEventListener('input', (e) => {
             const value = e.target.value;
             textureValue.textContent = value + '%';
-            updateBrushPreview();
         });
     }
     
@@ -1746,7 +1718,6 @@ function initializeBrushParams() {
         scatterSlider.addEventListener('input', (e) => {
             const value = e.target.value;
             scatterValue.textContent = value;
-            updateBrushPreview();
         });
     }
 }
@@ -1766,50 +1737,3 @@ function updateBrushParamsVisibility(brushKey) {
     }
 }
 
-function initializeBrushPreview() {
-    const canvas = document.getElementById('brushPreview');
-    if (!canvas) return;
-    
-    updateBrushPreview();
-}
-
-function updateBrushPreview() {
-    const canvas = document.getElementById('brushPreview');
-    if (!canvas || !brushSystem) return;
-    
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
-    
-    // 清空画布
-    ctx.clearRect(0, 0, width, height);
-    
-    // 创建临时画笔系统用于预览
-    const previewBrush = new BrushSystem(ctx);
-    previewBrush.setBrush(brushSystem.currentBrush);
-    
-    // 绘制预览线条
-    const startX = 20;
-    const startY = height / 2;
-    const endX = width - 20;
-    const endY = height / 2;
-    
-    // 绘制波浪线以展示效果
-    const steps = 30;
-    let prevX = startX;
-    let prevY = startY;
-    
-    previewBrush.startStroke(prevX, prevY, currentColor, brushSize);
-    
-    for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        const x = startX + (endX - startX) * t;
-        const y = startY + Math.sin(t * Math.PI * 2) * 10;
-        
-        previewBrush.drawStroke(prevX, prevY, x, y, currentColor, brushSize);
-        prevX = x;
-        prevY = y;
-    }
-    
-    previewBrush.endStroke();
-}
