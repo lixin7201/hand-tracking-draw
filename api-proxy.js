@@ -1,6 +1,8 @@
 // API Proxy Server for AI Transform Feature
 // This server handles API calls to avoid CORS issues and protect API keys
 
+require('dotenv').config({ path: '.env.local' });
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -46,6 +48,10 @@ app.get('/health', (req, res) => {
 app.post('/api/analyze-doodle', async (req, res) => {
     try {
         const { imageDataUrl, description } = req.body;
+        
+        if (!imageDataUrl) {
+            throw new Error('No image provided');
+        }
         
         const systemPrompt = `你是一个富有想象力的艺术分析师。请仔细观察这幅儿童涂鸦，并进行以下分析：
 
