@@ -551,6 +551,58 @@ function detectGestureAndDraw(landmarks) {
     const thumbTip = landmarks[4];  // 拇指尖
     const thumbMcp = landmarks[2];  // 拇指根部
     
+    // 先计算手指状态，用于后续判断
+    const isIndexUp = indexTip.y < indexMcp.y - 0.05;
+    const isMiddleUp = middleTip.y < middleMcp.y - 0.05;
+    const isRingUp = ringTip.y < ringMcp.y - 0.05;
+    const isPinkyUp = pinkyTip.y < pinkyMcp.y - 0.05;
+    const isThumbUp = Math.abs(thumbTip.x - thumbMcp.x) > 0.05;
+    
+    // 调试输出
+    if (isIndexUp && isMiddleUp && isRingUp && !isPinkyUp && !isThumbUp) {
+        console.log('三指状态 - 食指:✓ 中指:✓ 无名指:✓ 小指:✗ 拇指:✗');
+    }
+    // 计算伸直的手指数量（不包括拇指的版本，用于三指检测）
+    const fingersUpNoThumb = [isIndexUp, isMiddleUp, isRingUp, isPinkyUp].filter(x => x).length;
+    // 包括拇指的版本
+    const fingersUp = [isIndexUp, isMiddleUp, isRingUp, isPinkyUp, isThumbUp].filter(x => x).length;
+    
+    // 获取食指尖位置（用于绘制）
+    const x = indexTip.x * drawingCanvas.width;
+    const y = indexTip.y * drawingCanvas.height;
+    
+    // 重要：先检测三指手势，避免被捏合手势阻挡
+    // 使用fingersUpNoThumb来检测三指（不计算拇指）
+    if (fingersUpNoThumb === 3 && isIndexUp && isMiddleUp && isRingUp && !isPinkyUp) {
+        console.log('检测到三指手势(食中无名), 贴纸数量:', stickerSystem ? stickerSystem.stickers.length : 0);
+        // 三指（食指、中指、无名指） - 贴纸拖拽模式
+        if (stickerSystem && stickerSystem.stickers.length > 0) {
+            // 使用三指的中心点作为拖拽位置
+            const dragX = ((indexTip.x + middleTip.x + ringTip.x) / 3) * drawingCanvas.width;
+            const dragY = ((indexTip.y + middleTip.y + ringTip.y) / 3) * drawingCanvas.height;
+            
+            if (!stickerSystem.draggedSticker) {
+                // 开始拖拽
+                const started = stickerSystem.startDragging(dragX, dragY);
+                if (started) {
+                    console.log('三指手势开始拖拽贴纸');
+                }
+            } else {
+                // 移动贴纸
+                stickerSystem.moveSticker(dragX, dragY);
+            }
+            isDrawing = false;
+            isErasing = false;
+            return; // 处理完三指手势后直接返回
+        }
+    }
+    
+    // 结束三指拖拽（当不是三指时）
+    if (stickerSystem && stickerSystem.draggedSticker && fingersUpNoThumb !== 3) {
+        stickerSystem.stopDragging();
+        console.log('三指手势结束拖拽');
+    }
+    
     // 计算食指和拇指之间的距离（捏合检测）
     const pinchDistance = Math.sqrt(
         Math.pow((indexTip.x - thumbTip.x) * drawingCanvas.width, 2) +
@@ -560,8 +612,8 @@ function detectGestureAndDraw(landmarks) {
     // 捏合阈值（像素）
     const pinchThreshold = 35;
     
-    // 检测手势状态
-    if (pinchDistance < pinchThreshold) {
+    // 检测捏合手势（两指）
+    if (pinchDistance < pinchThreshold && fingersUp <= 2) {
         // 手指捏合状态
         if (!isPinching) {
             isPinching = true;
@@ -677,47 +729,8 @@ function detectGestureAndDraw(landmarks) {
         }
     }
     
-    // 原有的手势检测逻辑
-    // 计算手指是否伸直
-    const isIndexUp = indexTip.y < indexMcp.y - 0.05;
-    const isMiddleUp = middleTip.y < middleMcp.y - 0.05;
-    const isRingUp = ringTip.y < ringMcp.y - 0.05;
-    const isPinkyUp = pinkyTip.y < pinkyMcp.y - 0.05;
-    const isThumbUp = Math.abs(thumbTip.x - thumbMcp.x) > 0.05;
-    
-    // 计算伸直的手指数量
-    const fingersUp = [isIndexUp, isMiddleUp, isRingUp, isPinkyUp, isThumbUp].filter(x => x).length;
-    
-    // 获取食指尖位置（用于绘制）
-    const x = indexTip.x * drawingCanvas.width;
-    const y = indexTip.y * drawingCanvas.height;
-    
-    // 三指手势检测 - 用于贴纸拖拽
-    if (fingersUp === 3 && isIndexUp && isMiddleUp && isRingUp && !isPinkyUp) {
-        // 三指（食指、中指、无名指） - 贴纸拖拽模式
-        if (stickerSystem) {
-            // 使用三指的中心点作为拖拽位置
-            const dragX = ((indexTip.x + middleTip.x + ringTip.x) / 3) * drawingCanvas.width;
-            const dragY = ((indexTip.y + middleTip.y + ringTip.y) / 3) * drawingCanvas.height;
-            
-            if (!stickerSystem.draggedSticker) {
-                // 开始拖拽
-                const started = stickerSystem.startDragging(dragX, dragY);
-                if (started) {
-                    console.log('三指手势开始拖拽贴纸');
-                }
-            } else {
-                // 移动贴纸
-                stickerSystem.moveSticker(dragX, dragY);
-            }
-        }
-        isDrawing = false;
-        isErasing = false;
-    } else if (stickerSystem && stickerSystem.draggedSticker && fingersUp !== 3) {
-        // 不是三指时，结束贴纸拖拽
-        stickerSystem.stopDragging();
-        console.log('三指手势结束拖拽');
-    } else if (fingersUp === 5) {
+    // 其他手势检测
+    if (fingersUp === 5) {
         // 五指张开 - 清空画布
         clearCanvas();
         isDrawing = false;
@@ -815,6 +828,36 @@ function clearCanvas() {
     showSiteTitle();
 }
 
+// 辅助函数：合并所有画布层
+// includeBackground: 是否包含背景（视频或白色）
+// backgroundType: 'video' 或 'white'
+function mergeAllCanvasLayers(includeBackground = true, backgroundType = 'white') {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = drawingCanvas.width;
+    tempCanvas.height = drawingCanvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // 绘制背景
+    if (includeBackground) {
+        if (backgroundType === 'video' && video) {
+            tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+        } else {
+            tempCtx.fillStyle = 'white';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        }
+    }
+    
+    // 绘制用户的画
+    tempCtx.drawImage(drawingCanvas, 0, 0);
+    
+    // 绘制贴纸层
+    if (stickerCanvas) {
+        tempCtx.drawImage(stickerCanvas, 0, 0);
+    }
+    
+    return tempCanvas;
+}
+
 function saveDrawing() {
     // 显示保存选择弹窗
     const modal = document.getElementById('saveModal');
@@ -825,17 +868,8 @@ function saveDrawing() {
 
 // 保存带摄像头背景的图片
 function saveWithCamera() {
-    // 创建临时画布合并视频和绘图
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = drawingCanvas.width;
-    tempCanvas.height = drawingCanvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    
-    // 绘制视频帧
-    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-    
-    // 绘制用户的画
-    tempCtx.drawImage(drawingCanvas, 0, 0);
+    // 使用辅助函数合并所有层
+    const tempCanvas = mergeAllCanvasLayers(true, 'video');
     
     // 应用宽高比裁剪
     const result = createAspectRatioCanvas(tempCanvas, false);
@@ -852,18 +886,8 @@ function saveWithCamera() {
 
 // 保存白色背景的图片
 function saveWithWhiteBackground() {
-    // 创建临时画布
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = drawingCanvas.width;
-    tempCanvas.height = drawingCanvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    
-    // 填充白色背景
-    tempCtx.fillStyle = 'white';
-    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    
-    // 绘制用户的画
-    tempCtx.drawImage(drawingCanvas, 0, 0);
+    // 使用辅助函数合并所有层
+    const tempCanvas = mergeAllCanvasLayers(true, 'white');
     
     // 应用宽高比裁剪
     const result = createAspectRatioCanvas(tempCanvas, true, 'white');
@@ -1711,6 +1735,11 @@ async function startTransformation() {
         
         // 绘制用户的画
         tempCtx.drawImage(drawingCanvas, 0, 0);
+        
+        // 绘制贴纸层
+        if (stickerCanvas) {
+            tempCtx.drawImage(stickerCanvas, 0, 0);
+        }
         
         // 调用AI转换
         const result = await window.ArtTransform.transformDoodleToArt(

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>快速测试 AI API</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-btn { padding: 10px 20px; margin: 10px; cursor: pointer; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>API 快速测试</h1>
+    <button class="test-btn" onclick="testHealth()">测试 Health</button>
+    <button class="test-btn" onclick="testFullFlow()">测试完整流程</button>
+    <div id="log"></div>
+
+    <script>
+        function log(msg, type = '') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logDiv.appendChild(entry);
+        }
+
+        async function testHealth() {
+            try {
+                const resp = await fetch('http://localhost:3001/health');
+                const data = await resp.json();
+                log(`Health check: ${JSON.stringify(data)}`, 'success');
+            } catch (error) {
+                log(`Health check failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFullFlow() {
+            try {
+                // 创建测试画布
+                log('Creating test canvas...');
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                
+                // 绘制简单图形
+                ctx.fillStyle = '#87CEEB';
+                ctx.fillRect(0, 0, 512, 300);  // 天空
+                ctx.fillStyle = '#90EE90';
+                ctx.fillRect(0, 300, 512, 212);  // 草地
+                
+                // 画一只简单的狗
+                ctx.fillStyle = '#8B4513';
+                ctx.beginPath();
+                ctx.ellipse(256, 350, 60, 40, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 画彩色的山
+                const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1'];
+                for (let i = 0; i < 3; i++) {
+                    ctx.fillStyle = colors[i];
+                    ctx.beginPath();
+                    ctx.moveTo(100 + i * 100, 300);
+                    ctx.lineTo(150 + i * 100, 200);
+                    ctx.lineTo(200 + i * 100, 300);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                const imageDataUrl = canvas.toDataURL('image/png');
+                
+                // Step 1: 分析涂鸦
+                log('Step 1: Analyzing doodle...');
+                const base64Data = imageDataUrl.split(',')[1];
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: 'image/png' });
+                const formData = new FormData();
+                formData.append('image', blob, 'test.png');
+                formData.append('description', '小狗和彩色的山');
+                
+                const analyzeResp = await fetch('http://localhost:3001/api/analyze-doodle', {
+                    method: 'POST',
+                    body: formData
+                });
+                const analyzeData = await analyzeResp.json();
+                log(`Analysis: ${analyzeData.analysis?.substring(0, 100)}...`, analyzeData.success ? 'success' : 'error');
+                
+                if (!analyzeData.success) {
+                    throw new Error('Analysis failed');
+                }
+                
+                // Step 2: 生成提示词
+                log('Step 2: Generating prompt...');
+                const promptResp = await fetch('http://localhost:3001/api/generate-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analysis: analyzeData.analysis,
+                        style: 'ghibli',
+                        imageDataUrl: imageDataUrl
+                    })
+                });
+                const promptData = await promptResp.json();
+                log(`Prompt: ${promptData.prompt?.substring(0, 100)}...`, promptData.success ? 'success' : 'error');
+                
+                if (!promptData.success) {
+                    throw new Error('Prompt generation failed');
+                }
+                
+                // Step 3: 生成艺术画
+                log('Step 3: Generating art (this may take 30-60 seconds)...');
+                const artResp = await fetch('http://localhost:3001/api/generate-art', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: promptData.prompt,
+                        imageUrl: imageDataUrl,
+                        promptStrength: 0.8,
+                        aspectRatio: '1:1'
+                    })
+                });
+                const artData = await artResp.json();
+                
+                if (artData.success) {
+                    log(`✅ Art generated successfully!`, 'success');
+                    if (artData.imageUrl.startsWith('http')) {
+                        log(`Image URL: ${artData.imageUrl}`, 'success');
+                        window.open(artData.imageUrl, '_blank');
+                    }
+                } else {
+                    log(`Art generation failed: ${artData.error}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`Test failed: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

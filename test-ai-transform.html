@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试 AI 转画功能</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .canvas-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: crosshair;
+            background: white;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .primary-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .secondary-btn {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .style-selector {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .style-option {
+            padding: 8px 16px;
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .style-option:hover {
+            border-color: #667eea;
+        }
+        .style-option.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+        .result-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .result-box {
+            text-align: center;
+        }
+        .result-box img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-left: 3px solid #007bff;
+        }
+        .color-palette {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .color-btn {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+        .color-btn.active {
+            border: 3px solid #333;
+            transform: scale(1.15);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 AI 转画功能测试</h1>
+        
+        <div class="canvas-container">
+            <canvas id="drawingCanvas" width="512" height="512"></canvas>
+        </div>
+        
+        <div class="color-palette" id="colorPalette"></div>
+        
+        <div class="controls">
+            <button class="secondary-btn" onclick="clearCanvas()">清空画布</button>
+            <button class="secondary-btn" onclick="drawRandomDoodle()">随机涂鸦</button>
+            <button class="secondary-btn" onclick="drawSimpleShape()">简单图形</button>
+        </div>
+        
+        <div class="style-selector" id="styleSelector">
+            <div class="style-option active" data-style="watercolor">🎨 水彩画</div>
+            <div class="style-option" data-style="ghibli">🏞️ 吉卜力</div>
+            <div class="style-option" data-style="manga">📚 漫画</div>
+            <div class="style-option" data-style="oil">🖼️ 油画</div>
+            <div class="style-option" data-style="realistic">📷 写实</div>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="description" placeholder="描述你的画作（可选）" style="padding: 10px; width: 300px; border: 1px solid #ddd; border-radius: 5px;">
+            <button class="primary-btn" onclick="transformToArt()">🚀 AI 转画</button>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div class="result-container" id="resultContainer" style="display: none;">
+            <div class="result-box">
+                <h3>原始涂鸦</h3>
+                <img id="originalImage" src="" alt="原始涂鸦">
+            </div>
+            <div class="result-box">
+                <h3>AI 艺术画</h3>
+                <img id="transformedImage" src="" alt="AI 转换后">
+            </div>
+        </div>
+        
+        <div class="log-container" id="logContainer">
+            <strong>调试日志：</strong>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let currentColor = '#000000';
+        let selectedStyle = 'watercolor';
+        
+        // 初始化颜色板
+        const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'];
+        const colorPalette = document.getElementById('colorPalette');
+        colors.forEach((color, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'color-btn' + (index === 0 ? ' active' : '');
+            btn.style.backgroundColor = color;
+            btn.onclick = () => selectColor(color, btn);
+            colorPalette.appendChild(btn);
+        });
+        
+        function selectColor(color, btn) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+        
+        // 绘画功能
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+        
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = currentColor;
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        }
+        
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        // 风格选择
+        document.querySelectorAll('.style-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.style-option').forEach(o => o.classList.remove('active'));
+                this.classList.add('active');
+                selectedStyle = this.dataset.style;
+                addLog(`选择风格: ${this.textContent}`);
+            });
+        });
+        
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            addLog('清空画布');
+        }
+        
+        function drawRandomDoodle() {
+            clearCanvas();
+            ctx.strokeStyle = '#' + Math.floor(Math.random()*16777215).toString(16);
+            ctx.lineWidth = 2;
+            
+            // 绘制随机曲线
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                for (let j = 0; j < 4; j++) {
+                    ctx.quadraticCurveTo(
+                        Math.random() * canvas.width,
+                        Math.random() * canvas.height,
+                        Math.random() * canvas.width,
+                        Math.random() * canvas.height
+                    );
+                }
+                ctx.stroke();
+            }
+            
+            addLog('生成随机涂鸦');
+        }
+        
+        function drawSimpleShape() {
+            clearCanvas();
+            
+            // 绘制一个简单的笑脸
+            ctx.strokeStyle = '#FFD700';
+            ctx.fillStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            
+            // 脸
+            ctx.beginPath();
+            ctx.arc(256, 256, 100, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // 眼睛
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(230, 230, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(280, 230, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 嘴巴
+            ctx.beginPath();
+            ctx.arc(256, 256, 60, 0, Math.PI);
+            ctx.stroke();
+            
+            addLog('绘制简单笑脸');
+        }
+        
+        function showStatus(message, type = 'loading') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            addLog(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function addLog(message) {
+            const logContainer = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        async function transformToArt() {
+            try {
+                showStatus('开始 AI 转画流程...', 'loading');
+                
+                const description = document.getElementById('description').value;
+                const imageDataUrl = canvas.toDataURL('image/png');
+                
+                // Step 1: 分析涂鸦
+                showStatus('Step 1/3: 正在分析涂鸦内容...', 'loading');
+                addLog('调用 /api/analyze-doodle 接口');
+                
+                const base64Data = imageDataUrl.split(',')[1];
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: 'image/png' });
+                const formData = new FormData();
+                formData.append('image', blob, 'doodle.png');
+                formData.append('description', description);
+                
+                const analyzeResponse = await fetch('http://localhost:3001/api/analyze-doodle', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const analyzeData = await analyzeResponse.json();
+                if (!analyzeData.success) {
+                    throw new Error(analyzeData.error || '分析失败');
+                }
+                
+                addLog(`分析结果: ${analyzeData.analysis.substring(0, 50)}...`);
+                
+                // Step 2: 生成提示词
+                showStatus('Step 2/3: 正在生成艺术提示词...', 'loading');
+                addLog('调用 /api/generate-prompt 接口');
+                
+                const promptResponse = await fetch('http://localhost:3001/api/generate-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analysis: analyzeData.analysis,
+                        style: selectedStyle,
+                        imageDataUrl: imageDataUrl
+                    })
+                });
+                
+                const promptData = await promptResponse.json();
+                if (!promptData.success) {
+                    throw new Error(promptData.error || '生成提示词失败');
+                }
+                
+                addLog(`生成提示词: ${promptData.prompt.substring(0, 50)}...`);
+                
+                // Step 3: 生成艺术画
+                showStatus('Step 3/3: 正在生成艺术画作（可能需要30-60秒）...', 'loading');
+                addLog('调用 /api/generate-art 接口');
+                
+                const artResponse = await fetch('http://localhost:3001/api/generate-art', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: promptData.prompt,
+                        imageUrl: imageDataUrl,
+                        promptStrength: 0.8,
+                        aspectRatio: '1:1'
+                    })
+                });
+                
+                const artData = await artResponse.json();
+                if (!artData.success) {
+                    throw new Error(artData.error || '生成艺术画失败');
+                }
+                
+                // 显示结果
+                document.getElementById('originalImage').src = imageDataUrl;
+                document.getElementById('transformedImage').src = artData.imageUrl;
+                document.getElementById('resultContainer').style.display = 'grid';
+                
+                showStatus('✅ AI 转画成功！', 'success');
+                addLog('转换完成！');
+                
+            } catch (error) {
+                console.error('Transform error:', error);
+                showStatus(`❌ 转换失败: ${error.message}`, 'error');
+                addLog(`错误: ${error.message}`);
+            }
+        }
+        
+        // 初始化画布
+        clearCanvas();
+        addLog('页面加载完成，API 服务器地址: http://localhost:3001');
+    </script>
+</body>
+</html>
