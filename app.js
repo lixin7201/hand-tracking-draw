@@ -15,6 +15,8 @@ let coloringCanvas, coloringCtx;
 let hasStartedDrawing = false; // 跟踪是否开始画画
 let selectedStyle = null; // AI转画选中的样式
 let brushSystem = null; // 画笔系统
+let stickerSystem = null; // 贴纸系统
+let stickerCanvas, stickerCtx; // 贴纸画布
 
 // 鼠标模式相关变量
 let mouseCursor = null;
@@ -31,7 +33,7 @@ let positionHistory = [];
 
 // 初始化 - 使用load确保所有资源都加载完成
 window.addEventListener('load', async () => {
-    console.log('Window loaded, checking ArtTransform...');
+    console.log('Window loaded, checking dependencies...');
     
     // 确保ArtTransform已加载
     let attempts = 0;
@@ -45,6 +47,20 @@ window.addEventListener('load', async () => {
         console.log('ArtTransform loaded successfully');
     } else {
         console.error('ArtTransform failed to load after 10 attempts');
+    }
+    
+    // 确保 StickerSystem 加载
+    if (window.StickerSystem) {
+        console.log('StickerSystem loaded successfully');
+    } else {
+        console.warn('StickerSystem not loaded');
+    }
+    
+    // 确保 BrushSystem 加载
+    if (window.BrushSystem) {
+        console.log('BrushSystem loaded successfully');
+    } else {
+        console.error('BrushSystem not loaded');
     }
     
     await initializeApp();
@@ -64,12 +80,35 @@ async function initializeApp() {
     coloringCanvas = document.createElement('canvas');
     coloringCtx = coloringCanvas.getContext('2d');
     
+    // 获取贴纸画布（已在 HTML 中定义）
+    stickerCanvas = document.getElementById('stickerCanvas');
+    if (stickerCanvas) {
+        stickerCtx = stickerCanvas.getContext('2d');
+        console.log('StickerCanvas 获取成功');
+    } else {
+        console.error('StickerCanvas 未找到');
+    }
+    
     // 设置画布大小
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
     // 初始化画笔系统
     brushSystem = new BrushSystem(drawingCtx);
+    
+    // 初始化贴纸系统 - 延迟一下确保 DOM 完全准备好
+    setTimeout(() => {
+        if (window.StickerSystem && stickerCanvas) {
+            try {
+                stickerSystem = new StickerSystem(stickerCanvas);
+                console.log('贴纸系统初始化成功');
+            } catch (error) {
+                console.error('贴纸系统初始化失败:', error);
+            }
+        } else {
+            console.warn('StickerSystem 或 stickerCanvas 未准备好');
+        }
+    }, 100);
     
     // 初始化控件
     initializeControls();
@@ -98,6 +137,11 @@ function resizeCanvas() {
     handCanvas.height = height;
     templateCanvas.width = width;
     templateCanvas.height = height;
+    
+    if (stickerCanvas) {
+        stickerCanvas.width = width;
+        stickerCanvas.height = height;
+    }
     coloringCanvas.width = width;
     coloringCanvas.height = height;
     
@@ -110,13 +154,49 @@ function resizeCanvas() {
 function initializeTemplates() {
     const templateSelect = document.getElementById('templateSelect');
     
+    // 动态生成模板选项
+    if (templateSelect && window.drawingTemplates) {
+        // 清空现有选项
+        templateSelect.innerHTML = '<option value="">无模板</option>';
+        
+        // 添加所有模板分组
+        const categories = {
+            animals: '动物',
+            plants: '植物',
+            objects: '物品',
+            nature: '自然',
+            food: '食物',
+            vehicles: '交通工具',
+            people: '人物',
+            fantasy: '幻想'
+        };
+        
+        for (const [key, label] of Object.entries(categories)) {
+            if (drawingTemplates[key] && drawingTemplates[key].length > 0) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = label;
+                
+                drawingTemplates[key].forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = `${template.icon || ''} ${template.name}`;
+                    optgroup.appendChild(option);
+                });
+                
+                templateSelect.appendChild(optgroup);
+            }
+        }
+        
+        console.log(`加载了 ${Object.values(drawingTemplates).flat().length} 个模板`);
+    }
+    
     // 模板选择事件
     if (templateSelect) {
         templateSelect.addEventListener('change', (e) => {
             const value = e.target.value;
             if (value) {
-                // 查找对应的模板
-                const allTemplates = [...drawingTemplates.animals, ...drawingTemplates.plants];
+                // 查找对应的模板 - 从所有分类中查找
+                const allTemplates = Object.values(drawingTemplates).flat();
                 const template = allTemplates.find(t => t.id === value);
                 if (template) {
                     selectTemplate(template);
@@ -612,8 +692,32 @@ function detectGestureAndDraw(landmarks) {
     const x = indexTip.x * drawingCanvas.width;
     const y = indexTip.y * drawingCanvas.height;
     
-    // 根据手势执行不同操作
-    if (fingersUp === 5) {
+    // 三指手势检测 - 用于贴纸拖拽
+    if (fingersUp === 3 && isIndexUp && isMiddleUp && isRingUp && !isPinkyUp) {
+        // 三指（食指、中指、无名指） - 贴纸拖拽模式
+        if (stickerSystem) {
+            // 使用三指的中心点作为拖拽位置
+            const dragX = ((indexTip.x + middleTip.x + ringTip.x) / 3) * drawingCanvas.width;
+            const dragY = ((indexTip.y + middleTip.y + ringTip.y) / 3) * drawingCanvas.height;
+            
+            if (!stickerSystem.draggedSticker) {
+                // 开始拖拽
+                const started = stickerSystem.startDragging(dragX, dragY);
+                if (started) {
+                    console.log('三指手势开始拖拽贴纸');
+                }
+            } else {
+                // 移动贴纸
+                stickerSystem.moveSticker(dragX, dragY);
+            }
+        }
+        isDrawing = false;
+        isErasing = false;
+    } else if (stickerSystem && stickerSystem.draggedSticker && fingersUp !== 3) {
+        // 不是三指时，结束贴纸拖拽
+        stickerSystem.stopDragging();
+        console.log('三指手势结束拖拽');
+    } else if (fingersUp === 5) {
         // 五指张开 - 清空画布
         clearCanvas();
         isDrawing = false;
@@ -626,7 +730,14 @@ function detectGestureAndDraw(landmarks) {
         eraseAt(x, y);
     } else if (fingersUp === 1 && isIndexUp) {
         // 只有食指 - 绘制模式
-        isErasing = false;
+        if (isErasing) {
+            isErasing = false;
+            // 从橡皮擦切换回当前选中的画笔
+            const brushSelect = document.getElementById('brushSelect');
+            if (brushSelect) {
+                brushSystem.setBrush(brushSelect.value);
+            }
+        }
         draw(x, y);
     } else {
         // 其他手势 - 停止绘制
@@ -673,8 +784,9 @@ function draw(x, y) {
 
 function eraseAt(x, y) {
     // 使用画笔系统的橡皮擦
-    const previousBrush = brushSystem.currentBrush;
-    brushSystem.setBrush('eraser');
+    if (brushSystem.currentBrush !== 'eraser') {
+        brushSystem.setBrush('eraser');
+    }
     
     if (!isDrawing) {
         isDrawing = true;
@@ -692,6 +804,11 @@ function clearCanvas() {
     drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
     coloringCtx.clearRect(0, 0, coloringCanvas.width, coloringCanvas.height);
     templateCtx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
+    
+    // 清空贴纸
+    if (stickerSystem) {
+        stickerSystem.clearAll();
+    }
     
     // 清空画布后显示标题
     hasStartedDrawing = false;
@@ -1670,8 +1787,9 @@ function initializeBrushSelector() {
         selectBrush(brushKey);
     });
     
-    // 默认选中第一个画笔
-    brushSystem.setBrush('marker');
+    // 默认选中水彩笔
+    brushSystem.setBrush('watercolor');
+    brushSelect.value = 'watercolor';
     
     // 初始化画笔参数控件
     initializeBrushParams();

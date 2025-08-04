@@ -2,7 +2,7 @@
 class BrushSystem {
     constructor(ctx) {
         this.ctx = ctx;
-        this.currentBrush = 'marker';
+        this.currentBrush = 'watercolor';
         this.brushes = {
             // 马克笔
             marker: {
@@ -115,6 +115,8 @@ class BrushSystem {
     setBrush(brushType) {
         if (this.brushes[brushType]) {
             this.currentBrush = brushType;
+            // 强制重置合成模式，防止橡皮擦模式残留
+            this.ctx.globalCompositeOperation = 'source-over';
             return true;
         }
         return false;
@@ -135,6 +137,10 @@ class BrushSystem {
     drawStroke(x1, y1, x2, y2, color, size) {
         const brush = this.brushes[this.currentBrush];
         if (brush && brush.draw) {
+            // 每次绘制前确保重置合成模式（除非是橡皮擦）
+            if (this.currentBrush !== 'eraser') {
+                this.ctx.globalCompositeOperation = 'source-over';
+            }
             brush.draw(x1, y1, x2, y2, color, size);
             this.currentStroke.push({x: x2, y: y2});
         }
@@ -154,6 +160,7 @@ class BrushSystem {
         const params = this.brushes.marker.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = params.opacity;
         this.ctx.strokeStyle = color;
         this.ctx.lineWidth = size;
@@ -179,6 +186,7 @@ class BrushSystem {
         const params = this.brushes.coloredPencil.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = params.opacity;
         this.ctx.strokeStyle = color;
         
@@ -210,6 +218,7 @@ class BrushSystem {
         const params = this.brushes.watercolor.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         
         // 解析颜色并创建渐变
         const gradient = this.ctx.createRadialGradient(x2, y2, 0, x2, y2, size * params.spread);
@@ -244,6 +253,7 @@ class BrushSystem {
         const params = this.brushes.pencil.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = params.opacity;
         this.ctx.strokeStyle = color;
         
@@ -280,6 +290,7 @@ class BrushSystem {
         const params = this.brushes.spray.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.fillStyle = color;
         this.ctx.globalAlpha = params.opacity;
         
@@ -314,6 +325,7 @@ class BrushSystem {
         const params = this.brushes.roller.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = params.opacity;
         this.ctx.fillStyle = color;
         this.ctx.strokeStyle = color;
@@ -334,6 +346,7 @@ class BrushSystem {
         const params = this.brushes.crayon.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = params.opacity;
         this.ctx.fillStyle = color;
         
@@ -373,6 +386,7 @@ class BrushSystem {
         const params = this.brushes.pastel.params;
         
         this.ctx.save();
+        this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = params.opacity;
         
         // 创建柔和的粉末效果
